@@ -212,8 +212,40 @@ private:
 
 };
 
+template <size_t N> 
+struct Matrix_ {
+	float m[N * N] = {}; 
+	Matrix_() {
+		for (size_t i = 0;i < N;i++)
+			m[i * 5 + i] = 1; 
+	}
+	inline Vector4 operator*(const Vector4& rhs) const
+	{
+		double pos4[5] = {};
+		
+		for (int i = 0;i < 5;i++) {
+			for (int j = 0;j < 5;j++) {
+				pos4[i] = pos4[i] + m[i * 5 + j] * (j == 4 ? 1 : rhs[j]);
+			}
+		}
 
+		return Vector4(
+			pos4[0] / pos4[4],
+			pos4[1] / pos4[4],
+			pos4[2] / pos4[4],
+			pos4[3] / pos4[4]);
+	}
+	Matrix_&    translate(float x, float y, float z, float w) {		
+		m[N * 0] = x;
+		m[N * 1] = y;
+		m[N * 2] = z;
+		m[N * 3] = w;
+		return *this;
+	}
 
+};
+
+typedef Matrix_<5> Matrix5; 
 ///////////////////////////////////////////////////////////////////////////
 // inline functions for Matrix2
 ///////////////////////////////////////////////////////////////////////////

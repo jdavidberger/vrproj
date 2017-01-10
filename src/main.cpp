@@ -14,6 +14,8 @@
 #include "shared/Matrices.h"
 #include "shared/pathtools.h"
 
+#include "Resources/Resources.h"
+
 #if defined(POSIX)
 #include "unistd.h"
 #endif
@@ -78,9 +80,13 @@ public:
 	bool SetupTexturemaps();
 
 	void SetupScene();
+	void Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata); 
+	void Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
+	void Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
+
 	void AddCubeToScene( Matrix4 mat, std::vector<float> &vertdata );
 	void AddCubeVertex( float fl0, float fl1, float fl2, float fl3, float fl4, std::vector<float> &vertdata );
-
+	
 	void RenderControllerAxes();
 
 	bool SetupStereoRenderTargets();
@@ -172,9 +178,10 @@ private: // OpenGL bookkeeping
 
 	struct VertexDataScene
 	{
-		Vector3 position;
+		Vector4 position;
 		Vector2 texCoord;
 	};
+
 
 	struct VertexDataWindow
 	{
@@ -184,11 +191,14 @@ private: // OpenGL bookkeeping
 		VertexDataWindow( const Vector2 & pos, const Vector2 tex ) :  position(pos), texCoord(tex) {	}
 	};
 
+	GLuint m_unScene4dProgramID;
 	GLuint m_unSceneProgramID;
 	GLuint m_unCompanionWindowProgramID;
 	GLuint m_unControllerTransformProgramID;
 	GLuint m_unRenderModelProgramID;
 
+	GLint m_nScene4MatrixLocation; 
+	GLint m_nScenetx4to3Location;
 	GLint m_nSceneMatrixLocation;
 	GLint m_nControllerMatrixLocation;
 	GLint m_nRenderModelMatrixLocation;
@@ -470,13 +480,15 @@ void APIENTRY DebugCallback(GLenum source, GLenum type, GLuint id, GLenum severi
 //-----------------------------------------------------------------------------
 bool CMainApplication::BInitGL()
 {
-	if( m_bDebugOpenGL )
+	if( true )
 	{
 		glDebugMessageCallback( (GLDEBUGPROC)DebugCallback, nullptr);
 		glDebugMessageControl( GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE );
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	}
 
+	glDisable(GL_CULL_FACE);
+	
 	if( !CreateAllShaders() )
 		return false;
 
@@ -735,8 +747,8 @@ void CMainApplication::RenderFrame()
 	if ( m_iTrackedControllerCount != m_iTrackedControllerCount_Last || m_iValidPoseCount != m_iValidPoseCount_Last )
 	{
 		m_iValidPoseCount_Last = m_iValidPoseCount;
-		m_iTrackedControllerCount_Last = m_iTrackedControllerCount;
-		
+		m_iTrackedControllerCount_Last = m_iTrackedControllerCount;		
+
 		dprintf( "PoseCount:%d(%s) Controllers:%d\n", m_iValidPoseCount, m_strPoseClasses.c_str(), m_iTrackedControllerCount );
 	}
 
@@ -760,7 +772,10 @@ GLuint CMainApplication::CompileGLShader( const char *pchShaderName, const char 
 	glGetShaderiv( nSceneVertexShader, GL_COMPILE_STATUS, &vShaderCompiled);
 	if ( vShaderCompiled != GL_TRUE)
 	{
-		dprintf("%s - Unable to compile vertex shader %d!\n", pchShaderName, nSceneVertexShader);
+		char buffer[1024]; 
+		GLsizei  len = 0;
+		glGetShaderInfoLog(nSceneVertexShader, 1024, &len, buffer);
+		dprintf("%s - Unable to compile vertex shader %d!\n %s \n", pchShaderName, nSceneVertexShader, buffer);
 		glDeleteProgram( unProgramID );
 		glDeleteShader( nSceneVertexShader );
 		return 0;
@@ -776,7 +791,10 @@ GLuint CMainApplication::CompileGLShader( const char *pchShaderName, const char 
 	glGetShaderiv( nSceneFragmentShader, GL_COMPILE_STATUS, &fShaderCompiled);
 	if (fShaderCompiled != GL_TRUE)
 	{
-		dprintf("%s - Unable to compile fragment shader %d!\n", pchShaderName, nSceneFragmentShader );
+		char buffer[1024];
+		GLsizei  len = 0;
+		glGetShaderInfoLog(nSceneVertexShader, 1024, &len, buffer);
+		dprintf("%s - Unable to compile fragment shader %d!\n %s \n", pchShaderName, nSceneFragmentShader, buffer );
 		glDeleteProgram( unProgramID );
 		glDeleteShader( nSceneFragmentShader );
 		return 0;	
@@ -808,32 +826,19 @@ GLuint CMainApplication::CompileGLShader( const char *pchShaderName, const char 
 //-----------------------------------------------------------------------------
 bool CMainApplication::CreateAllShaders()
 {
+	m_unScene4dProgramID = CompileGLShader(
+		"Scene.4d",
+		Resources::scene_4d_vs,
+		Resources::scene_fs
+	);
+	m_nScenetx4to3Location = glGetUniformLocation(m_unScene4dProgramID, "tx4to3");
+	
+	m_nScene4MatrixLocation = glGetUniformLocation(m_unScene4dProgramID, "matrix");
+
 	m_unSceneProgramID = CompileGLShader(
 		"Scene",
-
-		// Vertex Shader
-		"#version 410\n"
-		"uniform mat4 matrix;\n"
-		"layout(location = 0) in vec4 position;\n"
-		"layout(location = 1) in vec2 v2UVcoordsIn;\n"
-		"layout(location = 2) in vec3 v3NormalIn;\n"
-		"out vec2 v2UVcoords;\n"
-		"void main()\n"
-		"{\n"
-		"	v2UVcoords = v2UVcoordsIn;\n"
-		"	gl_Position = matrix * position;\n"
-		"}\n",
-
-		// Fragment Shader
-		"#version 410 core\n"
-		"uniform sampler2D mytexture;\n"
-		"in vec2 v2UVcoords;\n"
-		"out vec4 outputColor;\n"
-		"void main()\n"
-		"{\n"
-		"   outputColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
-		//"   outputColor = texture(mytexture, v2UVcoords);\n"
-		"}\n"
+		Resources::scene_vs,
+		Resources::scene_fs
 		);
 	m_nSceneMatrixLocation = glGetUniformLocation( m_unSceneProgramID, "matrix" );
 	if( m_nSceneMatrixLocation == -1 )
@@ -844,28 +849,9 @@ bool CMainApplication::CreateAllShaders()
 
 	m_unControllerTransformProgramID = CompileGLShader(
 		"Controller",
+		Resources::controller_vs,
+		Resources::controller_fs);
 
-		// vertex shader
-		"#version 410\n"
-		"uniform mat4 matrix;\n"
-		"layout(location = 0) in vec4 position;\n"
-		"layout(location = 1) in vec3 v3ColorIn;\n"
-		"out vec4 v4Color;\n"
-		"void main()\n"
-		"{\n"
-		"	v4Color.xyz = v3ColorIn; v4Color.a = 1.0;\n"
-		"	gl_Position = matrix * position;\n"
-		"}\n",
-
-		// fragment shader
-		"#version 410\n"
-		"in vec4 v4Color;\n"
-		"out vec4 outputColor;\n"
-		"void main()\n"
-		"{\n"
-		"   outputColor = v4Color;\n"
-		"}\n"
-		);
 	m_nControllerMatrixLocation = glGetUniformLocation( m_unControllerTransformProgramID, "matrix" );
 	if( m_nControllerMatrixLocation == -1 )
 	{
@@ -875,31 +861,9 @@ bool CMainApplication::CreateAllShaders()
 
 	m_unRenderModelProgramID = CompileGLShader( 
 		"render model",
+		Resources::rendermodel_vs,
+		Resources::rendermodel_fs);
 
-		// vertex shader
-		"#version 410\n"
-		"uniform mat4 matrix;\n"
-		"layout(location = 0) in vec4 position;\n"
-		"layout(location = 1) in vec3 v3NormalIn;\n"
-		"layout(location = 2) in vec2 v2TexCoordsIn;\n"
-		"out vec2 v2TexCoord;\n"
-		"void main()\n"
-		"{\n"
-		"	v2TexCoord = v2TexCoordsIn;\n"
-		"	gl_Position = matrix * vec4(position.xyz, 1);\n"
-		"}\n",
-
-		//fragment shader
-		"#version 410 core\n"
-		"uniform sampler2D diffuse;\n"
-		"in vec2 v2TexCoord;\n"
-		"out vec4 outputColor;\n"
-		"void main()\n"
-		"{\n"
-		"   outputColor = texture( diffuse, v2TexCoord);\n"
-		"}\n"
-
-		);
 	m_nRenderModelMatrixLocation = glGetUniformLocation( m_unRenderModelProgramID, "matrix" );
 	if( m_nRenderModelMatrixLocation == -1 )
 	{
@@ -909,28 +873,8 @@ bool CMainApplication::CreateAllShaders()
 
 	m_unCompanionWindowProgramID = CompileGLShader(
 		"CompanionWindow",
-
-		// vertex shader
-		"#version 410 core\n"
-		"layout(location = 0) in vec4 position;\n"
-		"layout(location = 1) in vec2 v2UVIn;\n"
-		"noperspective out vec2 v2UV;\n"
-		"void main()\n"
-		"{\n"
-		"	v2UV = v2UVIn;\n"
-		"	gl_Position = position;\n"
-		"}\n",
-
-		// fragment shader
-		"#version 410 core\n"
-		"uniform sampler2D mytexture;\n"
-		"noperspective in vec2 v2UV;\n"
-		"out vec4 outputColor;\n"
-		"void main()\n"
-		"{\n"
-		"		outputColor = texture(mytexture, v2UV);\n"
-		"}\n"
-		);
+		Resources::companionwindow_vs,
+		Resources::companionwindow_fs);
 
 	return m_unSceneProgramID != 0 
 		&& m_unControllerTransformProgramID != 0
@@ -987,31 +931,12 @@ void CMainApplication::SetupScene()
 
 	std::vector<float> vertdataarray;
 
-	Matrix4 matScale;
-	matScale.scale( m_fScale, m_fScale, m_fScale );
 	Matrix4 matTransform;
-	matTransform.translate(
-		-( (float)m_iSceneVolumeWidth * m_fScaleSpacing ) / 2.f,
-		-( (float)m_iSceneVolumeHeight * m_fScaleSpacing ) / 2.f,
-		-( (float)m_iSceneVolumeDepth * m_fScaleSpacing ) / 2.f);
+	matTransform.translate(0, 0, -5);
 	
-	Matrix4 mat = matScale * matTransform;
-
-	for( int z = 0; z< m_iSceneVolumeDepth; z++ )
-	{
-		for( int y = 0; y< m_iSceneVolumeHeight; y++ )
-		{
-			for( int x = 0; x< m_iSceneVolumeWidth; x++ )
-			{
-				AddCubeToScene(mat, vertdataarray);
-				mat = mat * Matrix4().translate( m_fScaleSpacing, 0, 0 );
-			}
-			mat = mat * Matrix4().translate( -((float)m_iSceneVolumeWidth) * m_fScaleSpacing, m_fScaleSpacing, 0 );
-		}
-		mat = mat * Matrix4().translate( 0, -((float)m_iSceneVolumeHeight) * m_fScaleSpacing, m_fScaleSpacing );
-	}
+	Add5CellToScene(matTransform, vertdataarray);
 	
-	m_uiVertcount = vertdataarray.size()/5;
+	m_uiVertcount = vertdataarray.size()/ 6;
 	
 	glGenVertexArrays( 1, &m_unSceneVAO );
 	glBindVertexArray( m_unSceneVAO );
@@ -1020,13 +945,13 @@ void CMainApplication::SetupScene()
 	glBindBuffer( GL_ARRAY_BUFFER, m_glSceneVertBuffer );
 	glBufferData( GL_ARRAY_BUFFER, sizeof(float) * vertdataarray.size(), &vertdataarray[0], GL_STATIC_DRAW);
 
-	GLsizei stride = sizeof(VertexDataScene);
+	GLsizei stride = sizeof(Vector4) + sizeof(Vector2);
 	uintptr_t offset = 0;
 
 	glEnableVertexAttribArray( 0 );
-	glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, stride , (const void *)offset);
-
-	offset += sizeof(Vector3);
+	glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, stride , (const void *)offset);
+	
+	offset += sizeof(Vector4);
 	glEnableVertexAttribArray( 1 );
 	glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, stride, (const void *)offset);
 
@@ -1048,8 +973,66 @@ void CMainApplication::AddCubeVertex( float fl0, float fl1, float fl2, float fl3
 	vertdata.push_back( fl3 );
 	vertdata.push_back( fl4 );
 }
+void CMainApplication::Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata) {
+	Add5CellVertex(vec.x, vec.y, vec.z, vec.w, nx, ny, vertdata); 
+}
+void CMainApplication::Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata) {
+	vertdata.push_back(x);
+	vertdata.push_back(y);
+	vertdata.push_back(z);
+	vertdata.push_back(w);	
+	vertdata.push_back(nx);
+	vertdata.push_back(ny);
+}
 
+void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata) {
+	Vector4 A = Vector4(2, 0, 0-5, 0);
+	Vector4 B = Vector4(0, 2, 0-5, 0);
+	Vector4 C = Vector4(0, 0, 2-5, 0);
+	Vector4 D = Vector4(0, 0, 0-5, 2);
+	double t = 1.618033; 
+	Vector4 E = Vector4(t, t, t-5, t); 
 
+	Add5CellVertex(A, 0, 0, vertdata);
+	Add5CellVertex(B, 0, 1, vertdata);
+	Add5CellVertex(C, 1, 1, vertdata);
+	
+	Add5CellVertex(A, 0, 0, vertdata);
+	Add5CellVertex(B, 0, 1, vertdata);
+	Add5CellVertex(D, 1, 0, vertdata);
+
+	Add5CellVertex(A, 0, 0, vertdata);
+	Add5CellVertex(B, 0, 1, vertdata);
+	Add5CellVertex(E, .5, .5, vertdata);
+
+	Add5CellVertex(A, 0, 0, vertdata);
+	Add5CellVertex(C, 1, 1, vertdata);
+	Add5CellVertex(D, 1, 0, vertdata);
+
+	Add5CellVertex(A, 0, 0, vertdata);
+	Add5CellVertex(C, 1, 1, vertdata);
+	Add5CellVertex(E, .5, .5, vertdata);
+
+	Add5CellVertex(A, 0, 0, vertdata);
+	Add5CellVertex(D, 1, 0, vertdata);
+	Add5CellVertex(E, .5, .5, vertdata);
+
+	Add5CellVertex(B, 0, 1, vertdata);
+	Add5CellVertex(C, 1, 1, vertdata);
+	Add5CellVertex(D, 1, 0, vertdata);
+
+	Add5CellVertex(B, 0, 1, vertdata);
+	Add5CellVertex(C, 1, 1, vertdata);
+	Add5CellVertex(E, .5, .5, vertdata);
+
+	Add5CellVertex(B, 0, 1, vertdata);
+	Add5CellVertex(D, 1, 0, vertdata);
+	Add5CellVertex(E, .5, .5, vertdata);
+
+	Add5CellVertex(C, 1, 1, vertdata);
+	Add5CellVertex(D, 1, 0, vertdata);
+	Add5CellVertex(E, .5, .5, vertdata);
+}
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
@@ -1061,6 +1044,7 @@ void CMainApplication::AddCubeToScene( Matrix4 mat, std::vector<float> &vertdata
 	Vector4 B = mat * Vector4( 1, 0, 0, 1 );
 	Vector4 C = mat * Vector4( 1, 1, 0, 1 );
 	Vector4 D = mat * Vector4( 0, 1, 0, 1 );
+
 	Vector4 E = mat * Vector4( 0, 0, 1, 1 );
 	Vector4 F = mat * Vector4( 1, 0, 1, 1 );
 	Vector4 G = mat * Vector4( 1, 1, 1, 1 );
@@ -1391,11 +1375,19 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
-
+	static float t = 0; 
 	if( m_bShowCubes )
 	{
-		glUseProgram( m_unSceneProgramID );
-		glUniformMatrix4fv( m_nSceneMatrixLocation, 1, GL_FALSE, GetCurrentViewProjectionMatrix( nEye ).get() );
+		glUseProgram( m_unScene4dProgramID );
+		Matrix5 m; 
+		m.m[0] = cos(t);
+		m.m[3 * 5 + 0] = sin(t);
+		m.m[0 * 5 + 3] = -sin(t);
+		m.m[20 + 4] = cos(t);
+		t += 0.01;
+		auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
+		glUniformMatrix4fv( m_nScene4MatrixLocation, 1, GL_FALSE, viewMatrix.get() );		
+		glUniform1fv(m_nScenetx4to3Location, 25, m.m);
 		glBindVertexArray( m_unSceneVAO );
 		glBindTexture( GL_TEXTURE_2D, m_iTexture );
 		glDrawArrays( GL_TRIANGLES, 0, m_uiVertcount );
@@ -1565,7 +1557,7 @@ void CMainApplication::UpdateHMDMatrixPose()
 		}
 	}
 
-	if ( m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid )
+	if (false && m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid )
 	{
 		m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
 		m_mat4HMDPose.invert();
