@@ -212,23 +212,53 @@ private:
 
 };
 
+template <size_t N> struct Vector_ {
+	float m[N] = {}; 
+	Vector_() {}
+
+	template<typename... Arg>
+	Vector_(Arg... a) : m{ (float)a... } {
+		
+	}
+	float& operator[](size_t idx) { return m[idx]; }
+	const float operator[](size_t idx) const { return m[idx]; }
+};
+typedef Vector_<5> Vector5; 
+
 template <size_t N> 
 struct Matrix_ {
 	float m[N * N] = {}; 
 	Matrix_() {
 		for (size_t i = 0;i < N;i++)
-			m[i * 5 + i] = 1; 
+			set(i, i, 1);
 	}
-	inline Vector4 operator*(const Vector4& rhs) const
-	{
-		double pos4[5] = {};
-		
-		for (int i = 0;i < 5;i++) {
-			for (int j = 0;j < 5;j++) {
-				pos4[i] = pos4[i] + m[i * 5 + j] * (j == 4 ? 1 : rhs[j]);
+
+	float& get(size_t i, size_t j) {
+		return m[j * N + i];
+	}
+	float get(size_t i, size_t j) const {
+		return m[j * N + i];
+	}
+	void set(size_t i, size_t j, float val) {
+		get(i, j) = val;
+	}
+	inline Vector_<N> operator*(const Vector_<N>& rhs) const {
+		Vector_<N> rtn;
+		for (int j = 0;j < N;j++) {
+			for (int i = 0;i < N;i++) {
+				rtn[j] = rtn[j] + get(j, i) * rhs[i];
 			}
 		}
+		return rtn; 
+	}
+	inline Vector4 operator*(const Vector4& _rhs) const
+	{
+		Vector_<N> rhs;
+		for (size_t i = 0;i < 4;i++)
+			rhs[i] = _rhs[i]; 
+		rhs[4] = 1.0; 
 
+		auto pos4 = this->operator*(rhs);		
 		return Vector4(
 			pos4[0] / pos4[4],
 			pos4[1] / pos4[4],
@@ -236,13 +266,33 @@ struct Matrix_ {
 			pos4[3] / pos4[4]);
 	}
 	Matrix_&    translate(float x, float y, float z, float w) {		
-		m[N * 0] = x;
-		m[N * 1] = y;
-		m[N * 2] = z;
-		m[N * 3] = w;
+		get(0, N - 1) = x;
+		get(1, N - 1) = y;
+		get(2, N - 1) = z;
+		get(3, N - 1) = w;		
 		return *this;
 	}
-
+	Matrix_ operator*(const Matrix_& rhs) const {
+		Matrix_ m;
+		for (size_t c = 0; c < N; c++) {
+			for (size_t d = 0; d < N; d++) {
+				m.get(c, d) = 0;
+				for (size_t k = 0; k < N; k++) {
+					m.get(c, d) += get(c, k) * rhs.get(k, d);
+				}
+			}
+		}
+		return m; 
+	}
+	Matrix_& rotate(size_t i, size_t j, float t) {
+		Matrix_ m; 
+		m.set(i, i, cos(t));
+		m.set(i, j, sin(t));
+		m.set(j, i, -sin(t)); 
+		m.set(j, j, cos(t));
+		*this = *this * m; 
+		return *this; 
+	}
 };
 
 typedef Matrix_<5> Matrix5; 
@@ -429,7 +479,12 @@ inline Vector2 operator*(const Vector2& v, const Matrix2& rhs)
     return Vector2(v.x*rhs[0] + v.y*rhs[1],  v.x*rhs[2] + v.y*rhs[3]);
 }
 
-
+template <size_t N>
+inline std::ostream& operator<<(std::ostream& os, const Vector_<N>& m) {
+	for (size_t i = 0;i < N;i++)
+		os << m[i] << ", ";	
+	return os; 
+}
 
 inline std::ostream& operator<<(std::ostream& os, const Matrix2& m)
 {

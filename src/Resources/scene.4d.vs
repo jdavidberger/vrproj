@@ -11,12 +11,12 @@ void main()
 	v2UVcoords = v2UVcoordsIn;
 	float pos4[5];
 	
-	for(int i = 0;i < 5;i++) {
-		pos4[i] = 0;
-		for(int j = 0;j < 4;j++) {
-			pos4[i] = pos4[i] + tx4to3[j * 5 + i] * position[j]; 
+	for(int j = 0;j < 5;j++) {
+		pos4[j] = 0;
+		for(int i = 0;i < 4;i++) {
+			pos4[j] = pos4[j] + tx4to3[i * 5 + j] * position[i]; 
 		}
-		pos4[i] = pos4[i] + tx4to3[4 * 5 + i]; 
+		pos4[j] = pos4[j] + tx4to3[4 * 5 + j]; 
 	}
 	/*
 	pos4[0] = position.x; 

@@ -2,11 +2,11 @@ set(RESOURCES)
 file (WRITE ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h "")
 macro(generate_resource filename)
 	set(name ${ARGN}) 
-	if(name MATCHES "")
-		get_filename_component(name ${filename} NAME)		
-		string(REPLACE "." "_" name ${name})     
-	endif() 
-	   
+	if(name MATCHES "") 
+		get_filename_component(name ${filename} NAME)		 
+		string(REPLACE "." "_" name ${name} )     
+	endif()  
+	    
 	file(READ ${filename} contents)
 	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/Resources/${name}.h "namespace Resources { extern const char* ${name}; }")
 	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${name}.cpp "namespace Resources { const char* ${name} = R\"-_+*delimiter(${contents})-_+*delimiter\"; }")
@@ -22,19 +22,26 @@ FOREACH(rsrc ${resources_src})
 	generate_resource(${rsrc})	
 ENDFOREACH()
 
-add_executable(vrproj
+add_library(vrprojLib 
   ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h
   ${SHARED_SRC_FILES}
+  ${RESOURCES})
+
+target_link_libraries(vrprojLib 
+	${OPENGL_LIBRARIES}
+	  ${GLEW_LIBRARIES}
+	  ${SDL2_LIBRARIES}
+	  ${OPENVR_LIBRARIES} 
+	  ${CMAKE_DL_LIBS})
+
+add_executable(vrproj
   main.cpp  
-  ${RESOURCES}
 )
  
-target_link_libraries(vrproj
-  ${OPENGL_LIBRARIES}
-  ${GLEW_LIBRARIES}
-  ${SDL2_LIBRARIES}
-  ${OPENVR_LIBRARIES}
-  ${CMAKE_DL_LIBS}
-)
+target_link_libraries(vrproj vrprojLib)
+
+add_executable(vrprojTest test.cc)
+target_link_libraries(vrprojTest vrprojLib)
 
 setTargetOutputDirectory(vrproj)
+

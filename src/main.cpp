@@ -350,7 +350,7 @@ bool CMainApplication::BInit()
 		printf("%s - SDL could not initialize! SDL Error: %s\n", __FUNCTION__, SDL_GetError());
 		return false;
 	}
-
+	
 	// Loading the SteamVR Runtime
 	vr::EVRInitError eError = vr::VRInitError_None;
 	m_pHMD = vr::VR_Init( &eError, vr::VRApplication_Scene );
@@ -486,7 +486,7 @@ bool CMainApplication::BInitGL()
 		glDebugMessageControl( GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE );
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	}
-
+	glLineWidth(5);
 	glDisable(GL_CULL_FACE);
 	
 	if( !CreateAllShaders() )
@@ -700,7 +700,7 @@ void CMainApplication::RenderFrame()
 	// for now as fast as possible
 	if ( m_pHMD )
 	{
-		RenderControllerAxes();
+		//RenderControllerAxes();
 		RenderStereoTargets();
 		RenderCompanionWindow();
 
@@ -986,12 +986,13 @@ void CMainApplication::Add5CellVertex(float x, float y, float z, float w, float 
 }
 
 void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata) {
-	Vector4 A = Vector4(2, 0, 0-5, 0);
-	Vector4 B = Vector4(0, 2, 0-5, 0);
-	Vector4 C = Vector4(0, 0, 2-5, 0);
-	Vector4 D = Vector4(0, 0, 0-5, 2);
+	
+	Vector4 A = Vector4(2, 0, 0, 0);
+	Vector4 B = Vector4(0, 2, 0, 0);
+	Vector4 C = Vector4(0, 0, 2, 0);
+	Vector4 D = Vector4(0, 0, 0, 2);
 	double t = 1.618033; 
-	Vector4 E = Vector4(t, t, t-5, t); 
+	Vector4 E = Vector4(t, t, t, t);
 
 	Add5CellVertex(A, 0, 0, vertdata);
 	Add5CellVertex(B, 0, 1, vertdata);
@@ -1376,24 +1377,28 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 	static float t = 0; 
-	if( m_bShowCubes )
-	{
-		glUseProgram( m_unScene4dProgramID );
-		Matrix5 m; 
-		m.m[0] = cos(t);
-		m.m[3 * 5 + 0] = sin(t);
-		m.m[0 * 5 + 3] = -sin(t);
-		m.m[20 + 4] = cos(t);
-		t += 0.01;
-		auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
-		glUniformMatrix4fv( m_nScene4MatrixLocation, 1, GL_FALSE, viewMatrix.get() );		
-		glUniform1fv(m_nScenetx4to3Location, 25, m.m);
-		glBindVertexArray( m_unSceneVAO );
-		glBindTexture( GL_TEXTURE_2D, m_iTexture );
-		glDrawArrays( GL_TRIANGLES, 0, m_uiVertcount );
-		glBindVertexArray( 0 );
-	}
-
+	glUseProgram( m_unScene4dProgramID );
+	Matrix5 m; 
+	//m.translate(sin(t) * 3, 0, 0, 2); 
+	m.translate(0, 5, -7, 2);
+	m.rotate(0, 1, t); 
+	//m.rotate(0, 2, 2 * t);
+	m.rotate(1, 3, 2 * t);
+	m.rotate(0, 3, 3 * t);
+	m.m[24] = 4;
+	t += 0.01;
+	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
+		
+	glUniformMatrix4fv( m_nScene4MatrixLocation, 1, GL_FALSE, viewMatrix.get() );		
+	glUniform1fv(m_nScenetx4to3Location, 25, m.m);
+	glBindVertexArray( m_unSceneVAO );
+	glBindTexture( GL_TEXTURE_2D, m_iTexture );
+	if(m_bShowCubes)
+		glDrawArrays(GL_TRIANGLES, 0, m_uiVertcount );
+	else
+		glDrawArrays(GL_LINE_STRIP, 0, m_uiVertcount);
+	glBindVertexArray( 0 );
+	
 	bool bIsInputCapturedByAnotherProcess = m_pHMD->IsInputFocusCapturedByAnotherProcess();
 
 	if( !bIsInputCapturedByAnotherProcess )
@@ -1557,7 +1562,7 @@ void CMainApplication::UpdateHMDMatrixPose()
 		}
 	}
 
-	if (false && m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid )
+	if (m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid )
 	{
 		m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
 		m_mat4HMDPose.invert();
