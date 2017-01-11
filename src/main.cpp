@@ -7,9 +7,10 @@
 #include <stdio.h>
 #include <string>
 #include <cstdlib>
+#include <tuple>
 
 #include <openvr.h>
-
+#include <set>
 #include "shared/lodepng.h"
 #include "shared/Matrices.h"
 #include "shared/pathtools.h"
@@ -83,6 +84,10 @@ public:
 	void Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata); 
 	void Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
 	void Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
+
+	void AddHypercubeToScene(Matrix4 mat, std::vector<float> &vertdata);
+	void AddHypercubeVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
+	void AddHypercubeVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
 
 	void AddCubeToScene( Matrix4 mat, std::vector<float> &vertdata );
 	void AddCubeVertex( float fl0, float fl1, float fl2, float fl3, float fl4, std::vector<float> &vertdata );
@@ -273,7 +278,7 @@ CMainApplication::CMainApplication( int argc, char *argv[] )
 	, m_iValidPoseCount_Last( -1 )
 	, m_iSceneVolumeInit( 4 )
 	, m_strPoseClasses("")
-	, m_bShowCubes( true )
+	, m_bShowCubes( false )
 {
 
 	for( int i = 1; i < argc; i++ )
@@ -486,7 +491,7 @@ bool CMainApplication::BInitGL()
 		glDebugMessageControl( GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE );
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	}
-	glLineWidth(5);
+	glLineWidth(10);
 	glDisable(GL_CULL_FACE);
 	
 	if( !CreateAllShaders() )
@@ -934,7 +939,8 @@ void CMainApplication::SetupScene()
 	Matrix4 matTransform;
 	matTransform.translate(0, 0, -5);
 	
-	Add5CellToScene(matTransform, vertdataarray);
+	AddHypercubeToScene(matTransform, vertdataarray);
+	//Add5CellToScene(matTransform, vertdataarray);
 	
 	m_uiVertcount = vertdataarray.size()/ 6;
 	
@@ -965,6 +971,19 @@ void CMainApplication::SetupScene()
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
+
+void  CMainApplication::AddHypercubeVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata) {
+	vertdata.push_back(x);
+	vertdata.push_back(y);
+	vertdata.push_back(z);
+	vertdata.push_back(w);
+	vertdata.push_back(nx);
+	vertdata.push_back(ny);
+}
+void  CMainApplication::AddHypercubeVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata) {
+	AddHypercubeVertex(vec.x, vec.y, vec.z, vec.w, nx, ny, vertdata);
+}
+
 void CMainApplication::AddCubeVertex( float fl0, float fl1, float fl2, float fl3, float fl4, std::vector<float> &vertdata )
 {
 	vertdata.push_back( fl0 );
@@ -985,6 +1004,100 @@ void CMainApplication::Add5CellVertex(float x, float y, float z, float w, float 
 	vertdata.push_back(ny);
 }
 
+typedef std::tuple<Vector4, Vector4, Vector4, Vector4> HypercubeSurface; 
+typedef std::tuple<Vector4, Vector4> HypercubeEdge;
+
+static std::vector< Vector4 > HypercubeIndices() {
+	std::vector< Vector4 > vertices;
+
+	vertices.push_back(Vector4(1, 1, 1, 1));
+	vertices.push_back(Vector4(-1, 1, 1, 1));
+	vertices.push_back(Vector4(-1, -1, 1, 1));
+	vertices.push_back(Vector4(1, -1, 1, 1));
+
+	vertices.push_back(Vector4(1, -1, -1, 1));
+	vertices.push_back(Vector4(-1, -1, -1, 1));
+	vertices.push_back(Vector4(-1, 1, -1, 1));
+	vertices.push_back(Vector4(1, 1, -1, 1));
+
+	vertices.push_back(Vector4(1, 1, 1, -1));
+	vertices.push_back(Vector4(-1, 1, 1, -1));
+	vertices.push_back(Vector4(-1, -1, 1, -1));
+	vertices.push_back(Vector4(1, -1, 1, -1));
+
+	vertices.push_back(Vector4(1, -1, -1, -1));
+	vertices.push_back(Vector4(-1, -1, -1, -1));
+	vertices.push_back(Vector4(-1, 1, -1, -1));
+	vertices.push_back(Vector4(1, 1, -1, -1));
+
+	return vertices;
+}
+static std::vector< HypercubeSurface > HypercubeSurfaces() {
+	std::vector< HypercubeSurface > rtn;
+	std::vector<Vector4> vertices = HypercubeIndices();
+	std::set<std::set<size_t>> idxs;
+
+	for (size_t i = 0;i < vertices.size();i++) {
+		auto& vi = vertices[i];
+		for (size_t j = 0;j < vertices.size();j++) {
+			auto& vj = vertices[j];
+			if (i == j) continue;
+			if (vi.distance(vj) > 2.01) continue;
+
+			for (size_t k = 0;k < vertices.size();k++) {
+				auto& vk = vertices[k];
+				if (vi.distance(vk) > 2.01) continue;
+
+				for (size_t l = 0;l < vertices.size();l++) {
+					auto& vl = vertices[l];
+					if (vl.distance(vk) > 2.01 || vl.distance(vj) > 2.01) continue;
+
+					std::set<size_t> s{ i, j, k, l };
+					if (s.size() != 4) continue;
+					if (idxs.find(s) != idxs.end()) continue;
+					idxs.insert(s);
+
+					rtn.emplace_back(vi, vj, vl, vk);
+				}
+			}
+		}\
+	}
+	return rtn;
+}
+
+static std::vector< HypercubeEdge > HypercubeEdges() {
+	auto vertices = HypercubeIndices(); 
+	std::vector< HypercubeEdge > rtn; 
+
+	for (size_t i = 0;i < vertices.size();i++) {
+		auto& vi = vertices[i];
+		for (size_t j = 0;j < vertices.size();j++) {
+			auto& vj = vertices[j];
+			if (i == j) continue;
+			if (vi.distance(vj) > 2.01) continue;
+
+			rtn.emplace_back(vi, vj);
+		}
+	}
+	return rtn; 
+}
+
+void CMainApplication::AddHypercubeToScene(Matrix4 mat, std::vector<float> &vertdata) {
+	/*
+	for (auto& surface : HypercubeSurfaces()) {
+		AddHypercubeVertex(std::get<0>(surface), 1, 1, vertdata);
+		AddHypercubeVertex(std::get<1>(surface), 0, 1, vertdata);
+		AddHypercubeVertex(std::get<2>(surface), 1, 0, vertdata);
+
+		AddHypercubeVertex(std::get<2>(surface), 1, 0, vertdata);
+		AddHypercubeVertex(std::get<3>(surface), 0, 0, vertdata);
+		AddHypercubeVertex(std::get<0>(surface), 1, 1, vertdata);
+	}*/
+	for (auto& edge : HypercubeEdges()) {
+		AddHypercubeVertex(std::get<0>(edge), std::get<0>(edge).z > 0, std::get<0>(edge).w > 0, vertdata);
+		AddHypercubeVertex(std::get<1>(edge), std::get<1>(edge).z > 0, std::get<1>(edge).w > 0, vertdata);
+	}
+}
 void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata) {
 	
 	Vector4 A = Vector4(2, 0, 0, 0);
@@ -1380,11 +1493,14 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	glUseProgram( m_unScene4dProgramID );
 	Matrix5 m; 
 	//m.translate(sin(t) * 3, 0, 0, 2); 
-	m.translate(0, 5, -7, 2);
-	m.rotate(0, 1, t); 
-	//m.rotate(0, 2, 2 * t);
-	m.rotate(1, 3, 2 * t);
-	m.rotate(0, 3, 3 * t);
+	m.translate(0, 0, -2, 2);
+	//m.rotate(0, 1, t); 
+	m.rotate(0, 1, .1 * t);
+	m.rotate(0, 2, .1 * t);
+	m.rotate(1, 2, .1 * t);
+	m.rotate(0, 3, t);
+	m.rotate(2, 3, t);
+	m.rotate(1, 3, t);
 	m.m[24] = 4;
 	t += 0.01;
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
@@ -1396,7 +1512,7 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	if(m_bShowCubes)
 		glDrawArrays(GL_TRIANGLES, 0, m_uiVertcount );
 	else
-		glDrawArrays(GL_LINE_STRIP, 0, m_uiVertcount);
+		glDrawArrays(GL_LINES, 0, m_uiVertcount);
 	glBindVertexArray( 0 );
 	
 	bool bIsInputCapturedByAnotherProcess = m_pHMD->IsInputFocusCapturedByAnotherProcess();
@@ -1566,6 +1682,8 @@ void CMainApplication::UpdateHMDMatrixPose()
 	{
 		m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
 		m_mat4HMDPose.invert();
+		m_mat4HMDPose = Matrix4(); 
+		m_mat4HMDPose.translate(0, 0, -5);
 	}
 }
 
