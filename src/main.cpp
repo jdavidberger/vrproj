@@ -17,6 +17,8 @@
 
 #include "Resources/Resources.h"
 
+#include "ObjectBuffer.h"
+
 #if defined(POSIX)
 #include "unistd.h"
 #endif
@@ -56,6 +58,112 @@ private:
 
 static bool g_bPrintf = true;
 
+static std::vector< Vector4 > HypercubeIndices() {
+	std::vector< Vector4 > vertices;
+
+	vertices.push_back(Vector4(1, 1, 1, 1));
+	vertices.push_back(Vector4(-1, 1, 1, 1));
+	vertices.push_back(Vector4(-1, -1, 1, 1));
+	vertices.push_back(Vector4(1, -1, 1, 1));
+
+	vertices.push_back(Vector4(1, -1, -1, 1));
+	vertices.push_back(Vector4(-1, -1, -1, 1));
+	vertices.push_back(Vector4(-1, 1, -1, 1));
+	vertices.push_back(Vector4(1, 1, -1, 1));
+
+	vertices.push_back(Vector4(1, 1, 1, -1));
+	vertices.push_back(Vector4(-1, 1, 1, -1));
+	vertices.push_back(Vector4(-1, -1, 1, -1));
+	vertices.push_back(Vector4(1, -1, 1, -1));
+
+	vertices.push_back(Vector4(1, -1, -1, -1));
+	vertices.push_back(Vector4(-1, -1, -1, -1));
+	vertices.push_back(Vector4(-1, 1, -1, -1));
+	vertices.push_back(Vector4(1, 1, -1, -1));
+
+	return vertices;
+}
+static std::vector< Surface > HypercubeSurfaces() {
+	std::vector< Surface > rtn;
+	std::vector<Vector4> vertices = HypercubeIndices();
+	std::set<std::set<size_t>> idxs;
+
+	for (size_t i = 0;i < vertices.size();i++) {
+		auto& vi = vertices[i];
+		for (size_t j = 0;j < vertices.size();j++) {
+			auto& vj = vertices[j];
+			if (i == j) continue;
+			if (vi.distance(vj) > 2.01) continue;
+
+			for (size_t k = 0;k < vertices.size();k++) {
+				auto& vk = vertices[k];
+				if (vi.distance(vk) > 2.01) continue;
+
+				for (size_t l = 0;l < vertices.size();l++) {
+					auto& vl = vertices[l];
+					if (vl.distance(vk) > 2.01 || vl.distance(vj) > 2.01) continue;
+
+					std::set<size_t> s{ i, j, k, l };
+					if (s.size() != 4) continue;
+					if (idxs.find(s) != idxs.end()) continue;
+					idxs.insert(s);
+
+					Surface surface;					
+					surface.emplace_back(vi);//(vi, vj, vl, vk, 1, 1);
+					surface.emplace_back(vj);
+					surface.emplace_back(vk);				
+					surface.emplace_back(vl);
+
+					rtn.push_back(surface);
+				}
+			}
+		}
+	}
+	return rtn;
+}
+
+static std::vector< Edge > HypercubeEdges() {
+	auto vertices = HypercubeIndices();
+	std::vector< Edge > rtn;
+
+	for (size_t i = 0;i < vertices.size();i++) {
+		auto& vi = vertices[i];
+		for (size_t j = 0;j < vertices.size();j++) {
+			auto& vj = vertices[j];
+			if (i == j) continue;
+			if (vi.distance(vj) > 2.01) continue;
+
+			rtn.emplace_back(vi, vj);
+		}
+	}
+	return rtn;
+}
+static std::vector<Surface> CubeSurfaces() {
+	// Matrix4 mat( outermat.data() );
+
+	Vector4 A = Vector4(-1, -1, -1, 0);
+	Vector4 B = Vector4(1, -1, -1, 0);
+	Vector4 C = Vector4(1, 1, -1, 0);
+	Vector4 D = Vector4(-1, 1, -1, 0);
+
+	Vector4 E = Vector4(-1, -1, 1, 0);
+	Vector4 F = Vector4(1, -1, 1, 0);
+	Vector4 G = Vector4(1, 1, 1, 0);
+	Vector4 H = Vector4(-1, 1, 1, 0);
+
+	std::vector<Surface> rtn;
+
+	rtn.push_back(Surface({ F, E, G, H })); // Front
+	rtn.push_back(Surface({ A, B, D, C }));
+	rtn.push_back(Surface({ G, H, C, D }));
+	rtn.push_back(Surface({ B, A, F, E }));
+	rtn.push_back(Surface({ E, A, H, D }));
+	rtn.push_back(Surface({ B, F, C, G }));
+
+	return rtn;
+}
+
+
 //-----------------------------------------------------------------------------
 // Purpose:
 //------------------------------------------------------------------------------
@@ -85,13 +193,6 @@ public:
 	void Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
 	void Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
 
-	void AddHypercubeToScene(Matrix4 mat, std::vector<float> &vertdata);
-	void AddHypercubeVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
-	void AddHypercubeVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
-
-	void AddCubeToScene( Matrix4 mat, std::vector<float> &vertdata );
-	void AddCubeVertex( float fl0, float fl1, float fl2, float fl3, float fl4, std::vector<float> &vertdata );
-	
 	void RenderControllerAxes();
 
 	bool SetupStereoRenderTargets();
@@ -160,10 +261,8 @@ private: // OpenGL bookkeeping
 
 	GLuint m_iTexture;
 
-	unsigned int m_uiVertcount;
-
-	GLuint m_glSceneVertBuffer;
-	GLuint m_unSceneVAO;
+	std::vector< ObjectBuffer > m_objects; 
+	
 	GLuint m_unCompanionWindowVAO;
 	GLuint m_glCompanionWindowIDVertBuffer;
 	GLuint m_glCompanionWindowIDIndexBuffer;
@@ -267,8 +366,7 @@ CMainApplication::CMainApplication( int argc, char *argv[] )
 	, m_bVblank( false )
 	, m_bGlFinishHack( true )
 	, m_glControllerVertBuffer( 0 )
-	, m_unControllerVAO( 0 )
-	, m_unSceneVAO( 0 )
+	, m_unControllerVAO( 0 )	
 	, m_nSceneMatrixLocation( -1 )
 	, m_nControllerMatrixLocation( -1 )
 	, m_nRenderModelMatrixLocation( -1 )
@@ -445,7 +543,6 @@ bool CMainApplication::BInit()
  	m_fFarClip = 30.0f;
  
  	m_iTexture = 0;
- 	m_uiVertcount = 0;
  
 // 		m_MillisecondsTimer.start(1, this);
 // 		m_SecondsTimer.start(1000, this);
@@ -547,8 +644,7 @@ void CMainApplication::Shutdown()
 	{
 		glDebugMessageControl( GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_FALSE );
 		glDebugMessageCallback(nullptr, nullptr);
-		glDeleteBuffers(1, &m_glSceneVertBuffer);
-
+		
 		if ( m_unSceneProgramID )
 		{
 			glDeleteProgram( m_unSceneProgramID );
@@ -581,10 +677,6 @@ void CMainApplication::Shutdown()
 		if( m_unCompanionWindowVAO != 0 )
 		{
 			glDeleteVertexArrays( 1, &m_unCompanionWindowVAO );
-		}
-		if( m_unSceneVAO != 0 )
-		{
-			glDeleteVertexArrays( 1, &m_unSceneVAO );
 		}
 		if( m_unControllerVAO != 0 )
 		{
@@ -622,9 +714,46 @@ bool CMainApplication::HandleInput()
 			{
 				bRet = true;
 			}
+			
+			if (sdlEvent.key.keysym.sym == SDLK_RIGHT) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(0, 2, .01);
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_LEFT) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(0, 2, -.01);
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_UP) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(1, 2, -.01);
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_DOWN) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(1, 2, .01);
+			}
+
+			if (sdlEvent.key.keysym.sym == SDLK_d) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(0, 3, .01);
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_a) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(0, 3, -.01);
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_w) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(1, 3, -.01);
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_s) {
+				for (auto& o : m_objects)
+					o.m_tx.rotate(1, 3, .01);
+			}
+
 			if( sdlEvent.key.keysym.sym == SDLK_c )
 			{
-				m_bShowCubes = !m_bShowCubes;
+				for (auto& o : m_objects)
+					if (o.m_type != GL_LINES)
+						o.m_visible = !o.m_visible;
 			}
 		}
 	}
@@ -798,7 +927,7 @@ GLuint CMainApplication::CompileGLShader( const char *pchShaderName, const char 
 	{
 		char buffer[1024];
 		GLsizei  len = 0;
-		glGetShaderInfoLog(nSceneVertexShader, 1024, &len, buffer);
+		glGetShaderInfoLog(nSceneFragmentShader, 1024, &len, buffer);
 		dprintf("%s - Unable to compile fragment shader %d!\n %s \n", pchShaderName, nSceneFragmentShader, buffer );
 		glDeleteProgram( unProgramID );
 		glDeleteShader( nSceneFragmentShader );
@@ -934,64 +1063,50 @@ void CMainApplication::SetupScene()
 	if ( !m_pHMD )
 		return;
 
-	std::vector<float> vertdataarray;
+	std::vector<Vector3> colors = {		
+		Vector3(1, 0, 0),
+		Vector3(0, 1, 0),
+		Vector3(0, 0, 1),
+		Vector3(.5, .5, 0),
+		Vector3(0, .5, .5),
+		Vector3(.5, 0, .5),
+		Vector3(.8, .8, .8),
+		Vector3(1, 1, 0),
+		Vector3(0, 1, 1),
+		Vector3(1, 0, 1),
+		Vector3(1, .5, 0),
+		Vector3(0, .5, 1),
+		Vector3(1, 0, .5),
+	};
+	size_t idx = 0;
 
-	Matrix4 matTransform;
-	matTransform.translate(0, 0, -5);
+	auto edges = HypercubeEdges(); 
+	//auto surfaces = CubeSurfaces(); 
+	auto surfaces = HypercubeSurfaces();
+	for (auto& surface : surfaces) {
+		auto color = colors[idx++ % colors.size()];
+		for (auto& v : surface)
+			v.rgb = color; 
+	}
+	for (auto& edge : edges) {
+		Vector3 color(.1, .1, .1);
+		std::get<0>(edge).rgb = color;
+		std::get<1>(edge).rgb = color;
+	}
+
+	m_objects.emplace_back(surfaces);
+	m_objects.emplace_back(edges);
 	
-	AddHypercubeToScene(matTransform, vertdataarray);
-	//Add5CellToScene(matTransform, vertdataarray);
-	
-	m_uiVertcount = vertdataarray.size()/ 6;
-	
-	glGenVertexArrays( 1, &m_unSceneVAO );
-	glBindVertexArray( m_unSceneVAO );
-
-	glGenBuffers( 1, &m_glSceneVertBuffer );
-	glBindBuffer( GL_ARRAY_BUFFER, m_glSceneVertBuffer );
-	glBufferData( GL_ARRAY_BUFFER, sizeof(float) * vertdataarray.size(), &vertdataarray[0], GL_STATIC_DRAW);
-
-	GLsizei stride = sizeof(Vector4) + sizeof(Vector2);
-	uintptr_t offset = 0;
-
-	glEnableVertexAttribArray( 0 );
-	glVertexAttribPointer( 0, 4, GL_FLOAT, GL_FALSE, stride , (const void *)offset);
-	
-	offset += sizeof(Vector4);
-	glEnableVertexAttribArray( 1 );
-	glVertexAttribPointer( 1, 2, GL_FLOAT, GL_FALSE, stride, (const void *)offset);
-
-	glBindVertexArray( 0 );
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
-
+	Matrix5 m;
+	m.translate(0, 0, -3, 2);
+	for (auto& o : m_objects)
+		o.SetTx(m);
 }
 
 
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-
-void  CMainApplication::AddHypercubeVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata) {
-	vertdata.push_back(x);
-	vertdata.push_back(y);
-	vertdata.push_back(z);
-	vertdata.push_back(w);
-	vertdata.push_back(nx);
-	vertdata.push_back(ny);
-}
-void  CMainApplication::AddHypercubeVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata) {
-	AddHypercubeVertex(vec.x, vec.y, vec.z, vec.w, nx, ny, vertdata);
-}
-
-void CMainApplication::AddCubeVertex( float fl0, float fl1, float fl2, float fl3, float fl4, std::vector<float> &vertdata )
-{
-	vertdata.push_back( fl0 );
-	vertdata.push_back( fl1 );
-	vertdata.push_back( fl2 );
-	vertdata.push_back( fl3 );
-	vertdata.push_back( fl4 );
-}
 void CMainApplication::Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata) {
 	Add5CellVertex(vec.x, vec.y, vec.z, vec.w, nx, ny, vertdata); 
 }
@@ -1004,100 +1119,6 @@ void CMainApplication::Add5CellVertex(float x, float y, float z, float w, float 
 	vertdata.push_back(ny);
 }
 
-typedef std::tuple<Vector4, Vector4, Vector4, Vector4> HypercubeSurface; 
-typedef std::tuple<Vector4, Vector4> HypercubeEdge;
-
-static std::vector< Vector4 > HypercubeIndices() {
-	std::vector< Vector4 > vertices;
-
-	vertices.push_back(Vector4(1, 1, 1, 1));
-	vertices.push_back(Vector4(-1, 1, 1, 1));
-	vertices.push_back(Vector4(-1, -1, 1, 1));
-	vertices.push_back(Vector4(1, -1, 1, 1));
-
-	vertices.push_back(Vector4(1, -1, -1, 1));
-	vertices.push_back(Vector4(-1, -1, -1, 1));
-	vertices.push_back(Vector4(-1, 1, -1, 1));
-	vertices.push_back(Vector4(1, 1, -1, 1));
-
-	vertices.push_back(Vector4(1, 1, 1, -1));
-	vertices.push_back(Vector4(-1, 1, 1, -1));
-	vertices.push_back(Vector4(-1, -1, 1, -1));
-	vertices.push_back(Vector4(1, -1, 1, -1));
-
-	vertices.push_back(Vector4(1, -1, -1, -1));
-	vertices.push_back(Vector4(-1, -1, -1, -1));
-	vertices.push_back(Vector4(-1, 1, -1, -1));
-	vertices.push_back(Vector4(1, 1, -1, -1));
-
-	return vertices;
-}
-static std::vector< HypercubeSurface > HypercubeSurfaces() {
-	std::vector< HypercubeSurface > rtn;
-	std::vector<Vector4> vertices = HypercubeIndices();
-	std::set<std::set<size_t>> idxs;
-
-	for (size_t i = 0;i < vertices.size();i++) {
-		auto& vi = vertices[i];
-		for (size_t j = 0;j < vertices.size();j++) {
-			auto& vj = vertices[j];
-			if (i == j) continue;
-			if (vi.distance(vj) > 2.01) continue;
-
-			for (size_t k = 0;k < vertices.size();k++) {
-				auto& vk = vertices[k];
-				if (vi.distance(vk) > 2.01) continue;
-
-				for (size_t l = 0;l < vertices.size();l++) {
-					auto& vl = vertices[l];
-					if (vl.distance(vk) > 2.01 || vl.distance(vj) > 2.01) continue;
-
-					std::set<size_t> s{ i, j, k, l };
-					if (s.size() != 4) continue;
-					if (idxs.find(s) != idxs.end()) continue;
-					idxs.insert(s);
-
-					rtn.emplace_back(vi, vj, vl, vk);
-				}
-			}
-		}\
-	}
-	return rtn;
-}
-
-static std::vector< HypercubeEdge > HypercubeEdges() {
-	auto vertices = HypercubeIndices(); 
-	std::vector< HypercubeEdge > rtn; 
-
-	for (size_t i = 0;i < vertices.size();i++) {
-		auto& vi = vertices[i];
-		for (size_t j = 0;j < vertices.size();j++) {
-			auto& vj = vertices[j];
-			if (i == j) continue;
-			if (vi.distance(vj) > 2.01) continue;
-
-			rtn.emplace_back(vi, vj);
-		}
-	}
-	return rtn; 
-}
-
-void CMainApplication::AddHypercubeToScene(Matrix4 mat, std::vector<float> &vertdata) {
-	/*
-	for (auto& surface : HypercubeSurfaces()) {
-		AddHypercubeVertex(std::get<0>(surface), 1, 1, vertdata);
-		AddHypercubeVertex(std::get<1>(surface), 0, 1, vertdata);
-		AddHypercubeVertex(std::get<2>(surface), 1, 0, vertdata);
-
-		AddHypercubeVertex(std::get<2>(surface), 1, 0, vertdata);
-		AddHypercubeVertex(std::get<3>(surface), 0, 0, vertdata);
-		AddHypercubeVertex(std::get<0>(surface), 1, 1, vertdata);
-	}*/
-	for (auto& edge : HypercubeEdges()) {
-		AddHypercubeVertex(std::get<0>(edge), std::get<0>(edge).z > 0, std::get<0>(edge).w > 0, vertdata);
-		AddHypercubeVertex(std::get<1>(edge), std::get<1>(edge).z > 0, std::get<1>(edge).w > 0, vertdata);
-	}
-}
 void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata) {
 	
 	Vector4 A = Vector4(2, 0, 0, 0);
@@ -1150,64 +1171,6 @@ void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-void CMainApplication::AddCubeToScene( Matrix4 mat, std::vector<float> &vertdata )
-{
-	// Matrix4 mat( outermat.data() );
-
-	Vector4 A = mat * Vector4( 0, 0, 0, 1 );
-	Vector4 B = mat * Vector4( 1, 0, 0, 1 );
-	Vector4 C = mat * Vector4( 1, 1, 0, 1 );
-	Vector4 D = mat * Vector4( 0, 1, 0, 1 );
-
-	Vector4 E = mat * Vector4( 0, 0, 1, 1 );
-	Vector4 F = mat * Vector4( 1, 0, 1, 1 );
-	Vector4 G = mat * Vector4( 1, 1, 1, 1 );
-	Vector4 H = mat * Vector4( 0, 1, 1, 1 );
-
-	// triangles instead of quads
-	AddCubeVertex( E.x, E.y, E.z, 0, 1, vertdata ); //Front
-	AddCubeVertex( F.x, F.y, F.z, 1, 1, vertdata );
-	AddCubeVertex( G.x, G.y, G.z, 1, 0, vertdata );
-	AddCubeVertex( G.x, G.y, G.z, 1, 0, vertdata );
-	AddCubeVertex( H.x, H.y, H.z, 0, 0, vertdata );
-	AddCubeVertex( E.x, E.y, E.z, 0, 1, vertdata );
-					 
-	AddCubeVertex( B.x, B.y, B.z, 0, 1, vertdata ); //Back
-	AddCubeVertex( A.x, A.y, A.z, 1, 1, vertdata );
-	AddCubeVertex( D.x, D.y, D.z, 1, 0, vertdata );
-	AddCubeVertex( D.x, D.y, D.z, 1, 0, vertdata );
-	AddCubeVertex( C.x, C.y, C.z, 0, 0, vertdata );
-	AddCubeVertex( B.x, B.y, B.z, 0, 1, vertdata );
-					
-	AddCubeVertex( H.x, H.y, H.z, 0, 1, vertdata ); //Top
-	AddCubeVertex( G.x, G.y, G.z, 1, 1, vertdata );
-	AddCubeVertex( C.x, C.y, C.z, 1, 0, vertdata );
-	AddCubeVertex( C.x, C.y, C.z, 1, 0, vertdata );
-	AddCubeVertex( D.x, D.y, D.z, 0, 0, vertdata );
-	AddCubeVertex( H.x, H.y, H.z, 0, 1, vertdata );
-				
-	AddCubeVertex( A.x, A.y, A.z, 0, 1, vertdata ); //Bottom
-	AddCubeVertex( B.x, B.y, B.z, 1, 1, vertdata );
-	AddCubeVertex( F.x, F.y, F.z, 1, 0, vertdata );
-	AddCubeVertex( F.x, F.y, F.z, 1, 0, vertdata );
-	AddCubeVertex( E.x, E.y, E.z, 0, 0, vertdata );
-	AddCubeVertex( A.x, A.y, A.z, 0, 1, vertdata );
-					
-	AddCubeVertex( A.x, A.y, A.z, 0, 1, vertdata ); //Left
-	AddCubeVertex( E.x, E.y, E.z, 1, 1, vertdata );
-	AddCubeVertex( H.x, H.y, H.z, 1, 0, vertdata );
-	AddCubeVertex( H.x, H.y, H.z, 1, 0, vertdata );
-	AddCubeVertex( D.x, D.y, D.z, 0, 0, vertdata );
-	AddCubeVertex( A.x, A.y, A.z, 0, 1, vertdata );
-
-	AddCubeVertex( F.x, F.y, F.z, 0, 1, vertdata ); //Right
-	AddCubeVertex( B.x, B.y, B.z, 1, 1, vertdata );
-	AddCubeVertex( C.x, C.y, C.z, 1, 0, vertdata );
-	AddCubeVertex( C.x, C.y, C.z, 1, 0, vertdata );
-	AddCubeVertex( G.x, G.y, G.z, 0, 0, vertdata );
-	AddCubeVertex( F.x, F.y, F.z, 0, 1, vertdata );
-}
-
 
 //-----------------------------------------------------------------------------
 // Purpose: Draw all of the controllers as X/Y/Z lines
@@ -1489,31 +1452,32 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	//glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	static float t = 0; 
 	glUseProgram( m_unScene4dProgramID );
 	Matrix5 m; 
 	//m.translate(sin(t) * 3, 0, 0, 2); 
-	m.translate(0, 0, -2, 2);
-	//m.rotate(0, 1, t); 
-	m.rotate(0, 1, .1 * t);
-	m.rotate(0, 2, .1 * t);
-	m.rotate(1, 2, .1 * t);
-	m.rotate(0, 3, t);
-	m.rotate(2, 3, t);
-	m.rotate(1, 3, t);
+	m.translate(0, 0, -3, 2);
+	//m.rotate(0, 1, t); 	
+	m.rotate(0, 1, t);
+	m.rotate(0, 2, t);
+	m.rotate(1, 2, t);
+	m.rotate(0, 3, 10*t);
+	m.rotate(2, 3, 10 * t);
+	m.rotate(1, 3, 10 * t);
 	m.m[24] = 4;
-	t += 0.01;
+	t += 0.001;
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
 		
-	glUniformMatrix4fv( m_nScene4MatrixLocation, 1, GL_FALSE, viewMatrix.get() );		
-	glUniform1fv(m_nScenetx4to3Location, 25, m.m);
-	glBindVertexArray( m_unSceneVAO );
-	glBindTexture( GL_TEXTURE_2D, m_iTexture );
-	if(m_bShowCubes)
-		glDrawArrays(GL_TRIANGLES, 0, m_uiVertcount );
-	else
-		glDrawArrays(GL_LINES, 0, m_uiVertcount);
-	glBindVertexArray( 0 );
+	glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_FALSE, viewMatrix.get());
+	glBindTexture(GL_TEXTURE_2D, m_iTexture);
+	for (auto& buffer : m_objects) {
+		buffer.m_tx.m[25] = 4;
+		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.m);
+		buffer.Draw(); 
+	}
 	
 	bool bIsInputCapturedByAnotherProcess = m_pHMD->IsInputFocusCapturedByAnotherProcess();
 
@@ -1682,8 +1646,7 @@ void CMainApplication::UpdateHMDMatrixPose()
 	{
 		m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
 		m_mat4HMDPose.invert();
-		m_mat4HMDPose = Matrix4(); 
-		m_mat4HMDPose.translate(0, 0, -5);
+		m_mat4HMDPose = Matrix4(); 		
 	}
 }
 

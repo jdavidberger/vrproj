@@ -496,7 +496,7 @@ inline float Vector4::distance(const Vector4& vec) const {
 inline Vector4& Vector4::normalize() {
     //NOTE: leave w-component untouched
     //@@const float EPSILON = 0.000001f;
-    float xxyyzz = x*x + y*y + z*z;
+    float xxyyzz = x*x + y*y + z*z + w*w;
     //@@if(xxyyzz < EPSILON)
     //@@    return *this; // do nothing if it is zero vector
 
@@ -505,6 +505,7 @@ inline Vector4& Vector4::normalize() {
     x *= invLength;
     y *= invLength;
     z *= invLength;
+	w *= invLength;
     return *this;
 }
 

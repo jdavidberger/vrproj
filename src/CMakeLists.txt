@@ -25,13 +25,15 @@ ENDFOREACH()
 add_library(vrprojLib 
   ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h
   ${SHARED_SRC_FILES}
-  ${RESOURCES})
-
-target_link_libraries(vrprojLib 
-	${OPENGL_LIBRARIES}
+  ${RESOURCES} 
+  ObjectBuffer.cc ObjectBuffer.h      
+  )    
+       
+target_link_libraries(vrprojLib  
+	${OPENGL_LIBRARIES}   
 	  ${GLEW_LIBRARIES}
-	  ${SDL2_LIBRARIES}
-	  ${OPENVR_LIBRARIES} 
+	  ${SDL2_LIBRARIES} 
+	  ${OPENVR_LIBRARIES}    
 	  ${CMAKE_DL_LIBS})
 
 add_executable(vrproj
