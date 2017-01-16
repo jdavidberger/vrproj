@@ -167,7 +167,46 @@ static std::vector<Surface> CubeSurfaces() {
 	return rtn;
 }
 
+static std::vector< Edge > GetEdges(const std::vector<Surface>& surfaces) {
+	std::vector< Edge > rtn;
 
+	for (auto& surface : surfaces) {
+		rtn.push_back(Edge(surface[0], surface[1]));
+		rtn.push_back(Edge(surface[0], surface[2]));
+		if (surface.size() == 3) {
+			rtn.push_back(Edge(surface[1], surface[2]));
+		}
+		else {
+			rtn.push_back(Edge(surface[3], surface[1]));
+			rtn.push_back(Edge(surface[3], surface[2]));
+		}
+	}
+	
+	return rtn; 
+}
+static std::vector< Surface > FiveCellSurfaces() {
+	std::vector< Surface > rtn;
+
+	Vector4 A = Vector4(2, 0, 0, 0);
+	Vector4 B = Vector4(0, 2, 0, 0);
+	Vector4 C = Vector4(0, 0, 2, 0);
+	Vector4 D = Vector4(0, 0, 0, 2);
+	double t = 1.618033;
+	Vector4 E = Vector4(t, t, t, t);
+
+	rtn.push_back(Surface({ A, B, C }));
+	rtn.push_back(Surface({ A, B, D }));
+	rtn.push_back(Surface({ A, B, E }));
+	rtn.push_back(Surface({ A, C, D }));
+	rtn.push_back(Surface({ A, C, E }));
+	rtn.push_back(Surface({ A, D, E }));
+	rtn.push_back(Surface({ B, C, D }));
+	rtn.push_back(Surface({ B, C, E }));
+	rtn.push_back(Surface({ B, D, E }));
+	rtn.push_back(Surface({ C, D, E }));
+
+	return rtn;
+}
 //-----------------------------------------------------------------------------
 // Purpose:
 //------------------------------------------------------------------------------
@@ -193,7 +232,7 @@ public:
 	bool SetupTexturemaps();
 
 	void SetupScene();
-	void Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata); 
+	void Add5CellToScene(std::vector<float> &vertdata); 
 	void Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
 	void Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
 
@@ -1102,24 +1141,36 @@ void CMainApplication::SetupScene()
 	}
 
 	auto surfaces = HypercubeSurfaces();
-	for (auto& surface : surfaces) {
-		auto color = colors[idx++ % colors.size()];
-		for (auto& v : surface) {
-			v.rgb = Vector3(0,0,0);
-			
-			v.rgb[0] = ((v).vertex[3] + 1.) / 2.;
-			v.rgb[1] = ((v).vertex[1] + 1.) / 2.;
-			v.rgb[2] = ((v).vertex[2] + 1.) / 2.;
+	auto fiveSurfaces = FiveCellSurfaces();
+	auto fiveEdges = GetEdges(fiveSurfaces);
 
+	auto paintByPose = [&](std::vector<Surface>& surfaces) {
+		for (auto& surface : surfaces) {
+			auto color = colors[idx++ % colors.size()];
+			for (auto& v : surface) {
+				v.rgb = Vector3(0, 0, 0);
+
+				v.rgb[0] = ((v).vertex[3] + 1.) / 2.;
+				v.rgb[1] = ((v).vertex[1] + 1.) / 2.;
+				v.rgb[2] = ((v).vertex[2] + 1.) / 2.;
+
+			}
 		}
-	}
-	for (auto& edge : edges) {
-		Vector3 color(.1, .1, .1);
-		std::get<0>(edge).rgb = color;
-		std::get<0>(edge).rgb[0] = (std::get<0>(edge).vertex[3] + 1.) / 2.;
-		std::get<1>(edge).rgb = color;
-		std::get<1>(edge).rgb[0] = (std::get<1>(edge).vertex[3] + 1.) / 2.;
-	}
+	};
+	paintByPose(fiveSurfaces);
+	paintByPose(surfaces);
+
+	auto paintByPoseEdge = [&](std::vector<Edge>& edges) {
+		for (auto& edge : edges) {
+			Vector3 color(.1, .1, .1);
+			std::get<0>(edge).rgb = color;
+			std::get<0>(edge).rgb[0] = (std::get<0>(edge).vertex[3] + 1.) / 2.;
+			std::get<1>(edge).rgb = color;
+			std::get<1>(edge).rgb[0] = (std::get<1>(edge).vertex[3] + 1.) / 2.;
+		}
+	};
+	paintByPoseEdge(edges);
+	paintByPoseEdge(fiveEdges);
 
 	m_objects.emplace_back(surfaces);
 	m_objects.emplace_back(edges);
@@ -1128,13 +1179,21 @@ void CMainApplication::SetupScene()
 	MatrixUtils::translate(m, 0, 0, 0, 3);
 	for (auto& o : m_objects)
 		o.SetTx(m);
-/*
+
+	m = Matrix5::eye();
+	MatrixUtils::translate(m, 5, 0, 0, 3);
+	m_objects.emplace_back(fiveSurfaces);
+	m_objects.back().SetTx(m);
+
+	m_objects.emplace_back(fiveEdges);
+	m_objects.back().SetTx(m);
+
 	m_objects.emplace_back(csurfaces);
 
 	Matrix5 m2; 
-	m2.translate(2, 1, 0, 3); 
+	MatrixUtils::translate(m2, -5, 0, 0, 3);	
 	m_objects.back().SetTx(m2);
-	*/
+	
 }
 
 
@@ -1152,8 +1211,7 @@ void CMainApplication::Add5CellVertex(float x, float y, float z, float w, float 
 	vertdata.push_back(nx);
 	vertdata.push_back(ny);
 }
-
-void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata) {
+void CMainApplication::Add5CellToScene(std::vector<float> &vertdata) {
 	
 	Vector4 A = Vector4(2, 0, 0, 0);
 	Vector4 B = Vector4(0, 2, 0, 0);

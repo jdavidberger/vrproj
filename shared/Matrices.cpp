@@ -593,8 +593,8 @@ Matrix5 & MatrixUtils::setRotate(Matrix5 & R, size_t i, size_t j, float t) {
 Matrix5 MatrixUtils::getRotationMatrix(size_t i, size_t j, float t) {
 	Matrix5 m = Matrix5::eye();
 	m(i, i) = cos(t);
-	m(i, j) = sin(t);
-	m(j, i) = -sin(t);
+	m(i, j) = -sin(t);
+	m(j, i) = sin(t);
 	m(j, j) = cos(t);
 	return m;
 }
