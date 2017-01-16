@@ -14,9 +14,9 @@ vec4 transform(vec4 inputVec) {
 	for(int j = 0;j < 5;j++) {
 		pos4[j] = 0;
 		for(int i = 0;i < 4;i++) {
-			pos4[j] = pos4[j] + tx4to3[i * 5 + j] * inputVec[i]; 
+			pos4[j] = pos4[j] + tx4to3[j * 5 + i] * inputVec[i]; 
 		}
-		pos4[j] = pos4[j] + tx4to3[4 * 5 + j]; 
+		pos4[j] = pos4[j] + tx4to3[j * 5 + 4]; 
 	}
 	return vec4(pos4[0] / pos4[4],
 								pos4[1] / pos4[4],

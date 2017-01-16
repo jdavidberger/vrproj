@@ -20,6 +20,7 @@
 #include <algorithm>
 #include "Matrices.h"
 
+#ifdef AFEFWEF
 const float DEG2RAD = 3.141593f / 180;
 const float EPSILON = 0.00001f;
 
@@ -168,12 +169,12 @@ Matrix4& Matrix4::invert()
     else
     {
         this->invertGeneral();
-        /*@@ invertProjective() is not optimized (slower than generic one)
+        @@ invertProjective() is not optimized (slower than generic one)
         if(fabs(m[0]*m[5] - m[1]*m[4]) > EPSILON)
             this->invertProjective();   // inverse using matrix partition
         else
             this->invertGeneral();      // generalized inverse
-        */
+        
     }
 
     return *this;
@@ -579,3 +580,4 @@ Matrix4& Matrix4::rotateZ(float angle)
 
     return *this;
 }
+#endif

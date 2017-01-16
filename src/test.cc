@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]) {
 	{
-		Matrix5 f;
+		Matrix5 f = Matrix5::eye();
 		f.get(0, 0) = 2;
 		f.get(0, 1) = 2;
 
@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
 		std::cerr << val << std::endl;
 	}
 	{
-		Matrix5 f;
+		Matrix5 f = Matrix5::eye();
 		f.get(0, 0) = 2;
 		f.get(1, 0) = 2;
 

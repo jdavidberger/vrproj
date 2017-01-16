@@ -14,7 +14,9 @@ macro(generate_resource filename)
 	file (APPEND ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h "#include \"${CMAKE_CURRENT_BINARY_DIR}/Resources/${name}.h\"\n")
 endmacro()
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/resources)
+add_definitions(-DGLEW_STATIC)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/resources )
 
 FILE(GLOB resources_src RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/Resources/*")
 
@@ -28,13 +30,14 @@ add_library(vrprojLib
   ${RESOURCES} 
   ObjectBuffer.cc ObjectBuffer.h      
   )    
-       
-target_link_libraries(vrprojLib  
-	${OPENGL_LIBRARIES}   
-	  ${GLEW_LIBRARIES}
-	  ${SDL2_LIBRARIES} 
-	  ${OPENVR_LIBRARIES}    
-	  ${CMAKE_DL_LIBS})
+
+target_link_libraries( vrprojLib
+	  ${OPENGL_LIBRARIES}   
+	  ${GLEW_LIBRARY}
+	  opencv_core
+	  SDL2::SDL2 
+	  ${OPENVR_LIBRARY}    
+	  ${CMAKE_DL_LIBS} )
 
 add_executable(vrproj
   main.cpp  
@@ -45,5 +48,4 @@ target_link_libraries(vrproj vrprojLib)
 add_executable(vrprojTest test.cc)
 target_link_libraries(vrprojTest vrprojLib)
 
-setTargetOutputDirectory(vrproj)
 

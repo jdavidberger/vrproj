@@ -6,18 +6,18 @@ void ObjectBuffer::SetTx(const Matrix5 & tx)
 {
 	m_tx = tx; 
 }
-static void AddVertex(std::vector<float>& data, const VertexData& vd) {
-	data.push_back(vd.vertex.x);
-	data.push_back(vd.vertex.y);
-	data.push_back(vd.vertex.z);
-	data.push_back(vd.vertex.w);
-	data.push_back(vd.rgb.x);
-	data.push_back(vd.rgb.y);
-	data.push_back(vd.rgb.z);
-	data.push_back(vd.vertex.x);
-	data.push_back(vd.vertex.y);
-	data.push_back(vd.vertex.z);
-	data.push_back(vd.vertex.w);
+static void AddVertex(std::vector<float>& data, const VertexData& vd) {	
+	data.push_back(vd.vertex[0]);
+	data.push_back(vd.vertex[1]);
+	data.push_back(vd.vertex[2]);
+	data.push_back(vd.vertex[3]);
+	data.push_back(vd.rgb[0]);
+	data.push_back(vd.rgb[1]);
+	data.push_back(vd.rgb[2]);
+	data.push_back(vd.vertex[0]);
+	data.push_back(vd.vertex[1]);
+	data.push_back(vd.vertex[2]);
+	data.push_back(vd.vertex[3]);
 
 }
 ObjectBuffer::ObjectBuffer(const std::vector<Edge>& edges)
@@ -32,44 +32,48 @@ ObjectBuffer::ObjectBuffer(const std::vector<Edge>& edges)
 
 static Vector4 CalculateNormalFromBasis(const Vector4& U, const Vector4& V, const Vector4& W) {
 
-	Matrix3 a(U.y, V.y, W.y,
-		U.z, V.z, W.z,
-		U.w, V.w, W.w);
+	Matrix3 a(U[1], V[1], W[1],
+		U[2], V[2], W[2],
+		U[3], V[3], W[3]);
+	a = a.t();
 
-	Matrix3 b(U.x, V.x, W.x,
-		U.z, V.z, W.z,
-		U.w, V.w, W.w);
+	Matrix3 b(U[0], V[0], W[0],
+		U[2], V[2], W[2],
+		U[3], V[3], W[3]);
+	b = b.t();
 
-	Matrix3 c(U.x, V.x, W.x,
-		U.y, V.y, W.y,
-		U.w, V.w, W.w);
+	Matrix3 c(U[0], V[0], W[0],
+		U[1], V[1], W[1],
+		U[3], V[3], W[3]);
+	c = c.t();
 
-	Matrix3 d(U.x, V.x, W.x,
-		U.y, V.y, W.y,
-		U.z, V.z, W.z);
+	Matrix3 d(U[0], V[0], W[0],
+		U[1], V[1], W[1],
+		U[2], V[2], W[2]);
+	d = d.t();
 
-
-	auto e = Vector4(a.getDeterminant(), b.getDeterminant(), c.getDeterminant(), d.getDeterminant());
-	return e.normalize();
+	auto e = Vector4(cv::determinant(a), cv::determinant(b), cv::determinant(c), cv::determinant(d));
+	return cv::normalize(e);	
 }
 
 static Vector4 CalculateNormal(const Vector4& p1, const Vector4& p2, const Vector4& p3) {
 	auto mid = (p1 + p2 + p3) / 3;
 	auto U = p2 - p1;
 	auto V = p3 - p1;
-	U.normalize();
-	V.normalize();
+	U = cv::normalize(U);
+	V = cv::normalize(V);
+
 	auto W = Vector4(0,0,0,1);
 	auto e = CalculateNormalFromBasis(U, V, W);
-	if (isnan(e.length())) {
+	if (isnan( cv::norm(e) ) || cv::norm(e) < .5) {
 		W = Vector4(0, 0, 1, 0);
 		e = CalculateNormalFromBasis(U, V, W);
 	}
-	if (isnan(e.length())) {
+	if (isnan(cv::norm(e)) || cv::norm(e) < .5) {
 		W = Vector4(0, 1, 0, 0);
 		e = CalculateNormalFromBasis(U, V, W);
 	}
-	if (isnan(e.length())) {
+	if (isnan(cv::norm(e)) || cv::norm(e) < .5) {
 		W = Vector4(1, 0, 0, 0);
 		e = CalculateNormalFromBasis(U, V, W);
 	}
@@ -88,8 +92,9 @@ ObjectBuffer::ObjectBuffer(const std::vector<Surface>& surfaces)
 		for (size_t i = 2;i < e.size();i++) {
 			auto c = e[i];
 			auto n = CalculateNormal(a.vertex, b.vertex, c.vertex);
-			assert(n.length() > 0.99);
-			if ((a.vertex + n).length() < (a.vertex - n).length())
+			if(cv::norm(n) < 0.99)
+				assert(cv::norm(n) > 0.99);
+			if ( cv::norm(a.vertex + n) < cv::norm(a.vertex - n))
 				n = -n;
 			a.normal = b.normal = c.normal = n;
 			edges.emplace_back((a.vertex + b.vertex + c.vertex) / 3., n + (a.vertex + b.vertex + c.vertex) / 3.);

@@ -24,7 +24,7 @@ struct ObjectBuffer {
 	GLuint m_type = 0;
 	size_t m_length = 0;
 	bool m_visible = true;
-	Matrix5 m_tx; 
+	Matrix5 m_tx = Matrix5::eye();
 	void SetTx(const Matrix5& tx);
 	ObjectBuffer(const std::vector<Surface>& surfaces);
 	ObjectBuffer(const std::vector<Edge>& edges);

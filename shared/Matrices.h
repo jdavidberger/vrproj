@@ -1,3 +1,4 @@
+#pragma once
 ///////////////////////////////////////////////////////////////////////////////
 // Matrice.h
 // =========
@@ -16,6 +17,53 @@
 // Copyright (C) 2005 Song Ho Ahn
 ///////////////////////////////////////////////////////////////////////////////
 
+#include <opencv2/core.hpp>
+#include <array>
+typedef cv::Vec2f Vector2;
+typedef cv::Vec3f Vector3;
+typedef cv::Vec4f Vector4;
+
+template <size_t N> struct Matrix_ : public cv::Mat_<float> {
+	Matrix_() : cv::Mat_<float>(N, N, 0.) {}
+	Matrix_(const cv::MatCommaInitializer_<float>& init) : cv::Mat_<float>(init) {		
+	}
+
+	float getDeterminant() const {
+		return cv::determinant(*this);
+	}
+
+	
+	template <typename A>
+	Matrix_& operator*(const A& a) {
+		return *static_cast<cv::Mat_<float>*>(this) * a;
+	}
+};
+
+namespace MatrixUtils {
+	template <size_t N>
+	cv::Matx<float, N, N>& rotate(cv::Matx<float, N, N>& d, size_t i, size_t j, float t) {
+		cv::Matx<float, N, N> m = cv::Matx<float, N, N>::eye();
+		m(i, i) = cos(t);
+		m(i, j) = sin(t);
+		m(j, i) = -sin(t);
+		m(j, j) = cos(t);
+		d = d * m;
+		return d;
+	}
+
+	template<size_t N, typename... A>
+	cv::Matx<float, N, N>&  translate(cv::Matx<float, N, N>& d, A... a) {
+		float arr[] = { a... };
+		for (size_t i = 0;i < N - 1;i++)
+			d(i, N - 1) += arr[i];
+		return d;
+	}
+}
+typedef cv::Matx<float, 2, 2> Matrix2;
+typedef cv::Matx<float, 3, 3> Matrix3;
+typedef cv::Matx<float, 4, 4> Matrix4;
+typedef cv::Matx<float, 5, 5> Matrix5;
+/*
 #ifndef MATH_MATRICES_H
 #define MATH_MATRICES_H
 
@@ -994,3 +1042,4 @@ inline std::ostream& operator<<(std::ostream& os, const Matrix4& m)
 }
 // END OF MATRIX4 INLINE //////////////////////////////////////////////////////
 #endif
+*/

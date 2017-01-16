@@ -1,5 +1,5 @@
 //========= Copyright Valve Corporation ============//
-
+#define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <GL/glew.h>
 #include <SDL_opengl.h>
@@ -25,6 +25,8 @@
 
 #ifndef _WIN32
 #define APIENTRY
+#else
+#include "windows.h"
 #endif
 
 void ThreadSleep( unsigned long nMilliseconds )
@@ -93,15 +95,15 @@ static std::vector< Surface > HypercubeSurfaces() {
 		for (size_t j = 0;j < vertices.size();j++) {
 			auto& vj = vertices[j];
 			if (i == j) continue;
-			if (vi.distance(vj) > 2.01) continue;
+			if (cv::norm(vi - vj) > 2.01) continue;
 
 			for (size_t k = 0;k < vertices.size();k++) {
 				auto& vk = vertices[k];
-				if (vi.distance(vk) > 2.01) continue;
+				if (cv::norm(vi - vk) > 2.01) continue;
 
 				for (size_t l = 0;l < vertices.size();l++) {
 					auto& vl = vertices[l];
-					if (vl.distance(vk) > 2.01 || vl.distance(vj) > 2.01) continue;
+					if (cv::norm(vl - vk) > 2.01 || cv::norm(vl - vj) > 2.01) continue;
 
 					std::set<size_t> s{ i, j, k, l };
 					if (s.size() != 4) continue;
@@ -131,7 +133,7 @@ static std::vector< Edge > HypercubeEdges() {
 		for (size_t j = 0;j < vertices.size();j++) {
 			auto& vj = vertices[j];
 			if (i == j) continue;
-			if (vi.distance(vj) > 2.01) continue;
+			if (cv::norm(vi - vj) > 2.01) continue;
 
 			rtn.emplace_back(vi, vj);
 		}
@@ -272,13 +274,13 @@ private: // OpenGL bookkeeping
 	GLuint m_unControllerVAO;
 	unsigned int m_uiControllerVertcount;
 
-	Matrix4 m_mat4HMDPose;
-	Matrix4 m_mat4eyePosLeft;
-	Matrix4 m_mat4eyePosRight;
+	Matrix4 m_mat4HMDPose = Matrix4::eye();
+	Matrix4 m_mat4eyePosLeft = Matrix4::eye();
+	Matrix4 m_mat4eyePosRight = Matrix4::eye();
 
-	Matrix4 m_mat4ProjectionCenter;
-	Matrix4 m_mat4ProjectionLeft;
-	Matrix4 m_mat4ProjectionRight;
+	Matrix4 m_mat4ProjectionCenter = Matrix4::eye();
+	Matrix4 m_mat4ProjectionLeft = Matrix4::eye();
+	Matrix4 m_mat4ProjectionRight = Matrix4::eye();
 
 	struct VertexDataScene
 	{
@@ -717,36 +719,36 @@ bool CMainApplication::HandleInput()
 			
 			if (sdlEvent.key.keysym.sym == SDLK_RIGHT) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(0, 2, .01);
+					MatrixUtils::rotate(o.m_tx, 0, 2, .01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_LEFT) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(0, 2, -.01);
+					MatrixUtils::rotate(o.m_tx, 0, 2, -.01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_UP) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(1, 2, -.01);
+					MatrixUtils::rotate(o.m_tx, 1, 2, -.01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_DOWN) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(1, 2, .01);
+					MatrixUtils::rotate(o.m_tx, 1, 2, .01);
 			}
 
 			if (sdlEvent.key.keysym.sym == SDLK_d) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(0, 3, .01);
+					MatrixUtils::rotate(o.m_tx, 0, 3, .01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_a) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(0, 3, -.01);
+					MatrixUtils::rotate(o.m_tx, 0, 3, -.01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_w) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(1, 3, -.01);
+					MatrixUtils::rotate(o.m_tx, 1, 3, -.01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_s) {
 				for (auto& o : m_objects)
-					o.m_tx.rotate(1, 3, .01);
+					MatrixUtils::rotate(o.m_tx, 1, 3, .01);
 			}
 
 			if( sdlEvent.key.keysym.sym == SDLK_c )
@@ -1097,8 +1099,8 @@ void CMainApplication::SetupScene()
 	m_objects.emplace_back(surfaces);
 	m_objects.emplace_back(edges);
 	
-	Matrix5 m;
-	m.translate(0, 0, -3, 2);
+	Matrix5 m = Matrix5::eye();
+	MatrixUtils::translate(m, 0, 0, -3, 2);
 	for (auto& o : m_objects)
 		o.SetTx(m);
 }
@@ -1108,7 +1110,7 @@ void CMainApplication::SetupScene()
 // Purpose:
 //-----------------------------------------------------------------------------
 void CMainApplication::Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata) {
-	Add5CellVertex(vec.x, vec.y, vec.z, vec.w, nx, ny, vertdata); 
+	Add5CellVertex(vec[0], vec[1], vec[2], vec[3], nx, ny, vertdata); 
 }
 void CMainApplication::Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata) {
 	vertdata.push_back(x);
@@ -1210,21 +1212,21 @@ void CMainApplication::RenderControllerAxes()
 			point[i] += 0.05f;  // offset in X, Y, Z
 			color[i] = 1.0;  // R, G, B
 			point = mat * point;
-			vertdataarray.push_back( center.x );
-			vertdataarray.push_back( center.y );
-			vertdataarray.push_back( center.z );
+			vertdataarray.push_back( center[0] );
+			vertdataarray.push_back( center[1] );
+			vertdataarray.push_back( center[2] );
 
-			vertdataarray.push_back( color.x );
-			vertdataarray.push_back( color.y );
-			vertdataarray.push_back( color.z );
+			vertdataarray.push_back( color[0] );
+			vertdataarray.push_back( color[1] );
+			vertdataarray.push_back( color[2] );
 		
-			vertdataarray.push_back( point.x );
-			vertdataarray.push_back( point.y );
-			vertdataarray.push_back( point.z );
+			vertdataarray.push_back( point[0] );
+			vertdataarray.push_back( point[1] );
+			vertdataarray.push_back( point[2] );
 		
-			vertdataarray.push_back( color.x );
-			vertdataarray.push_back( color.y );
-			vertdataarray.push_back( color.z );
+			vertdataarray.push_back( color[0] );
+			vertdataarray.push_back( color[1] );
+			vertdataarray.push_back( color[2] );
 		
 			m_uiControllerVertcount += 2;
 		}
@@ -1233,11 +1235,11 @@ void CMainApplication::RenderControllerAxes()
 		Vector4 end = mat * Vector4( 0, 0, -39.f, 1 );
 		Vector3 color( .92f, .92f, .71f );
 
-		vertdataarray.push_back( start.x );vertdataarray.push_back( start.y );vertdataarray.push_back( start.z );
-		vertdataarray.push_back( color.x );vertdataarray.push_back( color.y );vertdataarray.push_back( color.z );
+		vertdataarray.push_back( start[0] );vertdataarray.push_back( start[1] );vertdataarray.push_back( start[2] );
+		vertdataarray.push_back( color[0] );vertdataarray.push_back( color[1] );vertdataarray.push_back( color[2] );
 
-		vertdataarray.push_back( end.x );vertdataarray.push_back( end.y );vertdataarray.push_back( end.z );
-		vertdataarray.push_back( color.x );vertdataarray.push_back( color.y );vertdataarray.push_back( color.z );
+		vertdataarray.push_back( end[0] );vertdataarray.push_back( end[1] );vertdataarray.push_back( end[2] );
+		vertdataarray.push_back( color[0] );vertdataarray.push_back( color[1] );vertdataarray.push_back( color[2] );
 		m_uiControllerVertcount += 2;
 	}
 
@@ -1455,27 +1457,13 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	glDepthFunc(GL_LEQUAL);
 	//glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	static float t = 0; 
 	glUseProgram( m_unScene4dProgramID );
-	Matrix5 m; 
-	//m.translate(sin(t) * 3, 0, 0, 2); 
-	m.translate(0, 0, -3, 2);
-	//m.rotate(0, 1, t); 	
-	m.rotate(0, 1, t);
-	m.rotate(0, 2, t);
-	m.rotate(1, 2, t);
-	m.rotate(0, 3, 10*t);
-	m.rotate(2, 3, 10 * t);
-	m.rotate(1, 3, 10 * t);
-	m.m[24] = 4;
-	t += 0.001;
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
-		
-	glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_FALSE, viewMatrix.get());
+	glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
 	for (auto& buffer : m_objects) {
-		buffer.m_tx.m[25] = 4;
-		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.m);
+		buffer.m_tx(4,4) = 4;
+		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw(); 
 	}
 	
@@ -1485,7 +1473,7 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	{
 		// draw the controller axis lines
 		glUseProgram( m_unControllerTransformProgramID );
-		glUniformMatrix4fv( m_nControllerMatrixLocation, 1, GL_FALSE, GetCurrentViewProjectionMatrix( nEye ).get() );
+		glUniformMatrix4fv( m_nControllerMatrixLocation, 1, GL_TRUE, GetCurrentViewProjectionMatrix( nEye ).val );
 		glBindVertexArray( m_unControllerVAO );
 		glDrawArrays( GL_LINES, 0, m_uiControllerVertcount );
 		glBindVertexArray( 0 );
@@ -1508,7 +1496,7 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 
 		const Matrix4 & matDeviceToTracking = m_rmat4DevicePose[ unTrackedDevice ];
 		Matrix4 matMVP = GetCurrentViewProjectionMatrix( nEye ) * matDeviceToTracking;
-		glUniformMatrix4fv( m_nRenderModelMatrixLocation, 1, GL_FALSE, matMVP.get() );
+		glUniformMatrix4fv( m_nRenderModelMatrixLocation, 1, GL_TRUE, matMVP.val );
 
 		m_rTrackedDeviceToRenderModel[ unTrackedDevice ]->Draw();
 	}
@@ -1555,7 +1543,7 @@ void CMainApplication::RenderCompanionWindow()
 Matrix4 CMainApplication::GetHMDMatrixProjectionEye( vr::Hmd_Eye nEye )
 {
 	if ( !m_pHMD )
-		return Matrix4();
+		return Matrix4::eye();
 
 	vr::HmdMatrix44_t mat = m_pHMD->GetProjectionMatrix( nEye, m_fNearClip, m_fFarClip );
 
@@ -1564,7 +1552,7 @@ Matrix4 CMainApplication::GetHMDMatrixProjectionEye( vr::Hmd_Eye nEye )
 		mat.m[0][1], mat.m[1][1], mat.m[2][1], mat.m[3][1], 
 		mat.m[0][2], mat.m[1][2], mat.m[2][2], mat.m[3][2], 
 		mat.m[0][3], mat.m[1][3], mat.m[2][3], mat.m[3][3]
-	);
+	).t();
 }
 
 
@@ -1574,7 +1562,7 @@ Matrix4 CMainApplication::GetHMDMatrixProjectionEye( vr::Hmd_Eye nEye )
 Matrix4 CMainApplication::GetHMDMatrixPoseEye( vr::Hmd_Eye nEye )
 {
 	if ( !m_pHMD )
-		return Matrix4();
+		return Matrix4::eye();
 
 	vr::HmdMatrix34_t matEyeRight = m_pHMD->GetEyeToHeadTransform( nEye );
 	Matrix4 matrixObj(
@@ -1584,7 +1572,8 @@ Matrix4 CMainApplication::GetHMDMatrixPoseEye( vr::Hmd_Eye nEye )
 		matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f
 		);
 
-	return matrixObj.invert();
+	cv::invert(matrixObj.t(), matrixObj);
+	return matrixObj;
 }
 
 
@@ -1594,7 +1583,7 @@ Matrix4 CMainApplication::GetHMDMatrixPoseEye( vr::Hmd_Eye nEye )
 //-----------------------------------------------------------------------------
 Matrix4 CMainApplication::GetCurrentViewProjectionMatrix( vr::Hmd_Eye nEye )
 {
-	Matrix4 matMVP;
+	Matrix4 matMVP = Matrix4::eye();
 	if( nEye == vr::Eye_Left )
 	{
 		matMVP = m_mat4ProjectionLeft * m_mat4eyePosLeft * m_mat4HMDPose;
@@ -1643,10 +1632,8 @@ void CMainApplication::UpdateHMDMatrixPose()
 	}
 
 	if (m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid )
-	{
-		m_mat4HMDPose = m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd];
-		m_mat4HMDPose.invert();
-		m_mat4HMDPose = Matrix4(); 		
+	{		
+		cv::invert(m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd], m_mat4HMDPose);		
 	}
 }
 
@@ -1777,7 +1764,7 @@ Matrix4 CMainApplication::ConvertSteamVRMatrixToMatrix4( const vr::HmdMatrix34_t
 		matPose.m[0][2], matPose.m[1][2], matPose.m[2][2], 0.0,
 		matPose.m[0][3], matPose.m[1][3], matPose.m[2][3], 1.0f
 		);
-	return matrixObj;
+	return matrixObj.t();
 }
 
 
