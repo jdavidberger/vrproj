@@ -10,7 +10,6 @@ out vec4 pos;
 
 vec4 transform(vec4 inputVec) {
 	float pos4[5];
-	
 	for(int j = 0;j < 5;j++) {
 		pos4[j] = 0;
 		for(int i = 0;i < 4;i++) {

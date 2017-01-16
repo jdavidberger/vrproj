@@ -19,7 +19,7 @@
 #include <cmath>
 #include <algorithm>
 #include "Matrices.h"
-
+#include <iostream>
 #ifdef AFEFWEF
 const float DEG2RAD = 3.141593f / 180;
 const float EPSILON = 0.00001f;
@@ -581,3 +581,37 @@ Matrix4& Matrix4::rotateZ(float angle)
     return *this;
 }
 #endif
+
+Matrix5 & MatrixUtils::setRotate(Matrix5 & R, size_t i, size_t j, float t) {
+	R(i, i) = cos(t);
+	R(i, j) = sin(t);
+	R(j, i) = -sin(t);
+	R(j, j) = cos(t);
+	return R;
+}
+
+Matrix5 MatrixUtils::getRotationMatrix(size_t i, size_t j, float t) {
+	Matrix5 m = Matrix5::eye();
+	m(i, i) = cos(t);
+	m(i, j) = sin(t);
+	m(j, i) = -sin(t);
+	m(j, j) = cos(t);
+	return m;
+}
+
+Vector3 MatrixUtils::getRotation(const Matrix4 & R) {
+	float sy = sqrt(R(0, 0) * R(0, 0) + R(1, 0) * R(1, 0));
+	bool singular = sy < 1e-6; // If
+	float x, y, z;
+	if (!singular) {
+		x = atan2(R(2, 1), R(2, 2));
+		y = atan2(-R(2, 0), sy);
+		z = atan2(R(1, 0), R(0, 0));
+	}
+	else {
+		x = atan2(-R(1, 2), R(1, 1));
+		y = atan2(-R(2, 0), sy);
+		z = 0;
+	}
+	return Vector3(x, y, z);
+}

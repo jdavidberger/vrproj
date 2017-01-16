@@ -93,6 +93,5 @@ bool Path_WriteStringToTextFile( const std::string &strFilename, const char *pch
 #define DYNAMIC_LIB_EXT	".so"
 #define PLATSUBDIR	"linux32"
 #else
-#warning "Unknown platform for PLATSUBDIR"
 #define PLATSUBDIR	"unknown_platform"
 #endif

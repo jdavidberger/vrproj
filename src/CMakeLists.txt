@@ -23,7 +23,7 @@ FILE(GLOB resources_src RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_
 FOREACH(rsrc ${resources_src})
 	generate_resource(${rsrc})	
 ENDFOREACH()
-
+ 
 add_library(vrprojLib 
   ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h  
   ${SHARED_SRC_FILES}
@@ -38,7 +38,7 @@ target_link_libraries( vrprojLib
 	  SDL2::SDL2 
 	  ${OPENVR_LIBRARY}    
 	  ${CMAKE_DL_LIBS} )
-
+	   
 add_executable(vrproj
   main.cpp  
 )

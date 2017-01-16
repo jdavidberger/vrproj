@@ -22,6 +22,8 @@
 #if defined(POSIX)
 #include "unistd.h"
 #endif
+static int firstC = -1;
+static int secondC = -1;
 
 #ifndef _WIN32
 #define APIENTRY
@@ -195,6 +197,8 @@ public:
 	void Add5CellVertex(float x, float y, float z, float w, float nx, float ny, std::vector<float> &vertdata);
 	void Add5CellVertex(const Vector4& vec, float nx, float ny, std::vector<float> &vertdata);
 
+	Matrix4 controllerAPos;
+	Matrix4 controllerBPos;
 	void RenderControllerAxes();
 
 	bool SetupStereoRenderTargets();
@@ -771,9 +775,16 @@ bool CMainApplication::HandleInput()
 	for( vr::TrackedDeviceIndex_t unDevice = 0; m_pHMD && unDevice < vr::k_unMaxTrackedDeviceCount; unDevice++ )
 	{
 		vr::VRControllerState_t state;
-		if( m_pHMD->GetControllerState( unDevice, &state, sizeof(state) ) )
+		if (m_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
 		{
-			m_rbShowTrackedDevice[ unDevice ] = state.ulButtonPressed == 0;
+			m_rbShowTrackedDevice[unDevice] = state.ulButtonPressed == 0;
+
+			if (unDevice == firstC) {
+				m_bShowCubes = (state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Trigger));
+				for (auto& o : m_objects)
+					if (o.m_type != GL_LINES)
+						o.m_visible = m_bShowCubes;
+			}
 		}
 	}
 
@@ -836,7 +847,7 @@ void CMainApplication::RenderFrame()
 	// for now as fast as possible
 	if ( m_pHMD )
 	{
-		//RenderControllerAxes();
+		RenderControllerAxes();
 		RenderStereoTargets();
 		RenderCompanionWindow();
 
@@ -1083,26 +1094,47 @@ void CMainApplication::SetupScene()
 	size_t idx = 0;
 
 	auto edges = HypercubeEdges(); 
-	//auto surfaces = CubeSurfaces(); 
+	auto csurfaces = CubeSurfaces(); 
+	for (auto& surface : csurfaces) {
+		auto color = colors[idx++ % colors.size()];
+		for (auto& v : surface)
+			v.rgb = color;
+	}
+
 	auto surfaces = HypercubeSurfaces();
 	for (auto& surface : surfaces) {
 		auto color = colors[idx++ % colors.size()];
-		for (auto& v : surface)
-			v.rgb = color; 
+		for (auto& v : surface) {
+			v.rgb = Vector3(0,0,0);
+			
+			v.rgb[0] = ((v).vertex[3] + 1.) / 2.;
+			v.rgb[1] = ((v).vertex[1] + 1.) / 2.;
+			v.rgb[2] = ((v).vertex[2] + 1.) / 2.;
+
+		}
 	}
 	for (auto& edge : edges) {
 		Vector3 color(.1, .1, .1);
 		std::get<0>(edge).rgb = color;
+		std::get<0>(edge).rgb[0] = (std::get<0>(edge).vertex[3] + 1.) / 2.;
 		std::get<1>(edge).rgb = color;
+		std::get<1>(edge).rgb[0] = (std::get<1>(edge).vertex[3] + 1.) / 2.;
 	}
 
 	m_objects.emplace_back(surfaces);
 	m_objects.emplace_back(edges);
 	
 	Matrix5 m = Matrix5::eye();
-	MatrixUtils::translate(m, 0, 0, -3, 2);
+	MatrixUtils::translate(m, 0, 0, 0, 3);
 	for (auto& o : m_objects)
 		o.SetTx(m);
+/*
+	m_objects.emplace_back(csurfaces);
+
+	Matrix5 m2; 
+	m2.translate(2, 1, 0, 3); 
+	m_objects.back().SetTx(m2);
+	*/
 }
 
 
@@ -1173,15 +1205,12 @@ void CMainApplication::Add5CellToScene(Matrix4 mat, std::vector<float> &vertdata
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
-
 //-----------------------------------------------------------------------------
 // Purpose: Draw all of the controllers as X/Y/Z lines
 //-----------------------------------------------------------------------------
 void CMainApplication::RenderControllerAxes()
 {
 	// don't draw controllers if somebody else has input focus
-	if( m_pHMD->IsInputFocusCapturedByAnotherProcess() )
-		return;
 
 	std::vector<float> vertdataarray;
 
@@ -1195,13 +1224,44 @@ void CMainApplication::RenderControllerAxes()
 
 		if( m_pHMD->GetTrackedDeviceClass( unTrackedDevice ) != vr::TrackedDeviceClass_Controller )
 			continue;
-
+	
 		m_iTrackedControllerCount += 1;
 
 		if( !m_rTrackedDevicePose[ unTrackedDevice ].bPoseIsValid )
 			continue;
 
+		if (firstC == -1)
+			firstC = unTrackedDevice;
+		else if (secondC == -1)
+			secondC = unTrackedDevice;
+
 		const Matrix4 & mat = m_rmat4DevicePose[unTrackedDevice];
+
+		static Vector3 eulerA, eulerB; 
+		if (unTrackedDevice == firstC) {
+			controllerAPos = mat;
+			eulerA = MatrixUtils::getRotation(mat);
+		} else if (unTrackedDevice == secondC) {
+			controllerBPos = mat;			
+			eulerB = MatrixUtils::getRotation(mat);
+		}
+		
+		auto newRotation =
+			MatrixUtils::getRotationMatrix(0, 1, eulerA[2]) *
+			MatrixUtils::getRotationMatrix(1, 2, eulerA[0]) *
+			MatrixUtils::getRotationMatrix(0, 2, eulerA[1]) *
+			MatrixUtils::getRotationMatrix(0, 3, eulerB[1]) *
+			MatrixUtils::getRotationMatrix(1, 3, eulerB[0]) *
+			MatrixUtils::getRotationMatrix(2, 3, eulerB[2]);
+
+		for (auto& o : m_objects) {			
+			if (unTrackedDevice == firstC) {
+				for(unsigned i = 0;i < 4;i++)
+					for (unsigned j = 0; j < 4; j++) {
+						o.m_tx(i, j) = newRotation(i, j);
+					}
+			}			
+		}
 
 		Vector4 center = mat * Vector4( 0, 0, 0, 1 );
 

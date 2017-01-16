@@ -38,8 +38,16 @@ template <size_t N> struct Matrix_ : public cv::Mat_<float> {
 		return *static_cast<cv::Mat_<float>*>(this) * a;
 	}
 };
-
+typedef cv::Matx<float, 2, 2> Matrix2;
+typedef cv::Matx<float, 3, 3> Matrix3;
+typedef cv::Matx<float, 4, 4> Matrix4;
+typedef cv::Matx<float, 5, 5> Matrix5;
 namespace MatrixUtils {
+
+	Matrix5& setRotate(Matrix5& R, size_t i, size_t j, float t);
+	Matrix5 getRotationMatrix(size_t i, size_t j, float t);
+
+	Vector3 getRotation(const Matrix4& R);
 	template <size_t N>
 	cv::Matx<float, N, N>& rotate(cv::Matx<float, N, N>& d, size_t i, size_t j, float t) {
 		cv::Matx<float, N, N> m = cv::Matx<float, N, N>::eye();
@@ -59,10 +67,7 @@ namespace MatrixUtils {
 		return d;
 	}
 }
-typedef cv::Matx<float, 2, 2> Matrix2;
-typedef cv::Matx<float, 3, 3> Matrix3;
-typedef cv::Matx<float, 4, 4> Matrix4;
-typedef cv::Matx<float, 5, 5> Matrix5;
+
 /*
 #ifndef MATH_MATRICES_H
 #define MATH_MATRICES_H
@@ -205,6 +210,41 @@ public:
     void        setColumn(int index, const Vector4& v);
     void        setColumn(int index, const Vector3& v);
 
+
+	float& get(size_t i, size_t j) {
+		return m[j * 4 + i];
+	}
+	float get(size_t i, size_t j) const {
+		return m[j * 4 + i];
+	}
+	Vector4 getPosition() const {
+		return this->operator*(Vector4(0, 0, 0, 1)); 
+	}
+	inline void getRotation(float& Yaw, float& Pitch, float& Roll) const
+	{
+		
+		if (get(1 -1, 1 - 1) == 1.0f)
+		{
+			Yaw = atan2f(get(1 -1, 3 - 1), get(3 -1, 4 - 1));
+			Pitch = 0;
+			Roll = 0;
+
+		}
+		else if (get(1 -1, 1 - 1) == -1.0f)
+		{
+			Yaw = atan2f(get(1 -1, 3 - 1), get(3 -1, 4 - 1));
+			Pitch = 0;
+			Roll = 0;
+		}
+		else
+		{
+
+			Yaw = atan2(-get(3 -1, 1 - 1), get(1 -1, 1 - 1));
+			Pitch = asin(get(2 -1, 1 - 1));
+			Roll = atan2(-get(2 -1, 3 - 1), get(2 -1, 2 - 1));
+		}
+	}
+
     const float* get() const;
     const float* getTranspose();                        // return transposed matrix
     float        getDeterminant();
@@ -331,6 +371,13 @@ struct Matrix_ {
 			}
 		}
 		return m; 
+	}
+	Matrix_& setRotate(size_t i, size_t j, float t) {
+		set(i, i, cos(t));
+		set(i, j, sin(t));
+		set(j, i, -sin(t));
+		set(j, j, cos(t));
+		return *this;
 	}
 	Matrix_& rotate(size_t i, size_t j, float t) {
 		Matrix_ m; 
