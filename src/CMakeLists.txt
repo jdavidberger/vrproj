@@ -25,7 +25,7 @@ FOREACH(rsrc ${resources_src})
 ENDFOREACH()
 
 add_library(vrprojLib 
-  ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h
+  ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h  
   ${SHARED_SRC_FILES}
   ${RESOURCES} 
   ObjectBuffer.cc ObjectBuffer.h      
@@ -33,7 +33,7 @@ add_library(vrprojLib
 
 target_link_libraries( vrprojLib
 	  ${OPENGL_LIBRARIES}   
-	  ${GLEW_LIBRARY}
+	  GLEW::GLEW
 	  opencv_core
 	  SDL2::SDL2 
 	  ${OPENVR_LIBRARY}    
