@@ -1,4 +1,3 @@
-//========= Copyright Valve Corporation ============//
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <GL/glew.h>

@@ -15,11 +15,11 @@ std::vector<cv::Vec2f> Triangulate2d(const std::vector<cv::Vec2f>& planePts)
 	in.numberofpoints = planePts.size();
 	in.pointlist = const_cast<float*>(&planePts.front()[0]);
 
-	triangulate("V", &in, &mid, &out);
+	triangulate("Vz", &in, &mid, &out);
 
 	std::vector<cv::Vec2f> tris;
-	for (size_t i = 0;i < mid.numberoftriangles;i++) {
-		float* pt = mid.pointlist + i * 2; 
+	for (size_t i = 0;i < mid.numberoftriangles * mid.numberofcorners;i++) {
+		float* pt = mid.trianglelist[i] * 2 + mid.pointlist; 
 		tris.emplace_back(pt[0], pt[1]);
 	}
 	return tris;
