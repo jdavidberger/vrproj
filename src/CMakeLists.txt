@@ -24,6 +24,8 @@ FOREACH(rsrc ${resources_src})
 	generate_resource(${rsrc})	
 ENDFOREACH()
  
+ add_subdirectory(GeomLib)
+ 
 add_library(vrprojLib 
   ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h  
   ${SHARED_SRC_FILES}
@@ -36,6 +38,7 @@ target_link_libraries( vrprojLib
 	  GLEW::GLEW
 	  opencv_core
 	  SDL2::SDL2 
+      GeomLib
 	  ${OPENVR_LIBRARY}    
 	  ${CMAKE_DL_LIBS} )
 	   
@@ -46,6 +49,6 @@ add_executable(vrproj
 target_link_libraries(vrproj vrprojLib)
 
 add_executable(vrprojTest test.cc)
-target_link_libraries(vrprojTest vrprojLib)
+target_link_libraries(vrprojTest vrprojLib GeomLib)
 
 

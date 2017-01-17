@@ -8,7 +8,7 @@
 #include <string>
 #include <cstdlib>
 #include <tuple>
-
+#include <Polytope.h>
 #include <openvr.h>
 #include <set>
 #include "shared/lodepng.h"
@@ -1194,6 +1194,25 @@ void CMainApplication::SetupScene()
 	MatrixUtils::translate(m2, -5, 0, 0, 3);	
 	m_objects.back().SetTx(m2);
 	
+
+	double A = 2, B = 3, C = 4, D = 5, E = 6;
+	auto make4PlanePt = [&](double x, double y, double z) {
+		return cv::Vec4f(x, y, z, (A * x + B * y + C * z + E) / D);
+	};
+	Polygon_<4> boundary4 = {
+		make4PlanePt(0, 0, 1),
+		make4PlanePt(0, 1, 2),
+		make4PlanePt(1, 0, 3),
+		make4PlanePt(1, 1, 4),
+		make4PlanePt(.5, .5, 5) };
+
+	Polytype_<4>::Surface four(boundary4);
+	std::vector<Edge> fourS;
+	for (unsigned i = 0;i < four.triangulation.size()-1;i++) {
+		fourS.emplace_back(four.triangulation[i], four.triangulation[i + 1]);
+	}
+	paintByPoseEdge(fourS);
+	m_objects.emplace_back(fourS);
 }
 
 

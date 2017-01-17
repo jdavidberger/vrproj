@@ -22,6 +22,7 @@
 typedef cv::Vec2f Vector2;
 typedef cv::Vec3f Vector3;
 typedef cv::Vec4f Vector4;
+typedef cv::Vec<float, 5> Vector5;
 
 template <size_t N> struct Matrix_ : public cv::Mat_<float> {
 	Matrix_() : cv::Mat_<float>(N, N, 0.) {}
