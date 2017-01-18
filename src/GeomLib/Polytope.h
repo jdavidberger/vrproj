@@ -1,6 +1,10 @@
+#pragma once
 #include <stdlib.h>
 #include "Polygon.h"
 #include <iostream>
+#include <utility>
+#include <unordered_set>
+
 std::vector<cv::Vec2f> Triangulate2d(const std::vector<cv::Vec2f>& input);
 
 template <size_t N>
@@ -47,13 +51,54 @@ struct Polytype_ {
 				triangulation.push_back(newpt + mean);
 			}
 		}
+
 		Surface(const Polygon_<N>& boundary) : boundary(boundary) {
 			ComputeTriangulation();
 		}
 	};
-
+	static std::vector< Surface > MakeSurfaces(const std::vector< Polygon_<N> >& polygons) {
+		std::vector< Surface > rtn;
+		rtn.reserve(polygons.size());
+		for (auto& it : polygons)
+			rtn.emplace_back(it);
+		return rtn;
+	}
+	typedef std::pair< cv::Vec<float, N>, cv::Vec<float, N> > edge_t;
+	struct EdgeComparator {
+		bool operator()(const cv::Vec<float, N>& a, const cv::Vec<float, N>& b) {
+			for (unsigned i = 0;i < N;i++) {
+				if (a[i] != b[i])
+					return a[i] < b[i]; 
+			}
+			return false; 
+		}
+		bool operator()(const edge_t& a, const edge_t& b) {
+			if(a.first == b.first)
+				return this->operator()(a.second, b.second);
+			return this->operator()(a.first, b.first);
+		}
+	};
 	struct Polytope {
-		Polytope(const std::vector< Surface >&);
+		
+		std::vector< Surface > surfaces; 
+		std::vector< edge_t > edges; 
+		void ComputeEdges() {
+			std::set<edge_t, EdgeComparator> edges; 
+
+			for (auto& surface : surfaces) {
+				auto lastPt = surface.boundary.front(); 
+				for (size_t i = 1;i < surface.boundary.size();i++) {					
+					edges.insert(std::make_pair(lastPt, surface.boundary[i])); 
+					lastPt = surface.boundary[i]; 
+				}
+				edges.insert(std::make_pair(lastPt, surface.boundary.front())); 
+			}
+			this->edges.insert(this->edges.end(), edges.begin(), edges.end());
+		}
+		Polytope(const std::vector< Polygon_<N> >& polygons) : Polytope(MakeSurfaces(polygons)) {}
+		Polytope(const std::vector< Surface >& surfaces) : surfaces(surfaces) {
+			ComputeEdges();
+		}
 	};
 };
 

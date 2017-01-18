@@ -2,8 +2,7 @@
 #include "shared/Matrices.h"
 #include <assert.h>
 
-void ObjectBuffer::SetTx(const Matrix5 & tx)
-{
+void ObjectBuffer::SetTx(const Matrix5 & tx) {
 	m_tx = tx; 
 }
 static void AddVertex(std::vector<float>& data, const VertexData& vd) {	
@@ -20,14 +19,19 @@ static void AddVertex(std::vector<float>& data, const VertexData& vd) {
 	data.push_back(vd.vertex[3]);
 
 }
-ObjectBuffer::ObjectBuffer(const std::vector<Edge>& edges)
-{
-	std::vector<float> data; 
+void ObjectBuffer::SetupEdges(const std::vector< edge_t >& edges) {
+	std::vector<float> data;
 	for (auto& e : edges) {
-		AddVertex(data, std::get<0>(e));
-		AddVertex(data, std::get<1>(e));
+		VertexData d = e.first; 
+		d.rgb = edgeVertexColor(e.first); 
+		AddVertex(data, d);
+		d.rgb = edgeVertexColor(e.second);
+		AddVertex(data, d);
 	}
-	SetBuffer(data, GL_LINES);
+	SetBuffer(m_unEdgeVAO, this->m_glEdgeVertBuffer, this->m_edgeLength, data);
+}
+ObjectBuffer::ObjectBuffer(const Polytype_<4>::Polytope& shape) {
+	SetupEdges(shape.edges);
 }
 
 static Vector4 CalculateNormalFromBasis(const Vector4& U, const Vector4& V, const Vector4& W) {
@@ -80,6 +84,7 @@ static Vector4 CalculateNormal(const Vector4& p1, const Vector4& p2, const Vecto
 	return e;
 }
 
+/*
 ObjectBuffer::ObjectBuffer(const std::vector<Surface>& surfaces)
 {
 	std::vector<float> data;
@@ -112,22 +117,17 @@ ObjectBuffer::ObjectBuffer(const std::vector<Surface>& surfaces)
 	
 //	SetBuffer(data, GL_LINE_STRIP);
 }
+*/
+void ObjectBuffer::SetBuffer(GLuint& vao, GLuint& buffer, size_t& length, 
+	const std::vector<float>& vertices)
+{	
+	length = vertices.size() / (sizeof(VertexData) / sizeof(float));
 
-ObjectBuffer::ObjectBuffer(const std::vector<float>& vertices, GLuint type) 
-{
-	SetBuffer(vertices, type); 
-}
+	glGenVertexArrays(1, &vao);
+	glBindVertexArray(vao);
 
-void ObjectBuffer::SetBuffer(const std::vector<float>& vertices, GLuint type)
-{
-	m_type = type;
-	m_length = vertices.size() / (sizeof(VertexData) / sizeof(float));
-
-	glGenVertexArrays(1, &m_unSceneVAO);
-	glBindVertexArray(m_unSceneVAO);
-
-	glGenBuffers(1, &m_glSceneVertBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, m_glSceneVertBuffer);
+	glGenBuffers(1, &buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, buffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
 
 	GLsizei stride = sizeof(VertexData);
@@ -149,18 +149,17 @@ void ObjectBuffer::SetBuffer(const std::vector<float>& vertices, GLuint type)
 	glDisableVertexAttribArray(1);
 }
 
-void ObjectBuffer::Draw() const
+void ObjectBuffer::Draw(bool drawSurfaces, bool drawEdges) const
 {
-	if (m_visible) {
+	if (drawSurfaces) {
 		glBindVertexArray(m_unSceneVAO);
-		glDrawArrays(m_type, 0, m_length);
-		glBindVertexArray(0);
-
-		for (size_t i = 0;i < children.size();i++) {
-			children[i].Draw();
-		}
-
+		glDrawArrays(GL_TRIANGLES, 0, m_length);
 	}
+	if (drawEdges) {
+		glBindVertexArray(m_unEdgeVAO);
+		glDrawArrays(GL_LINE, 0, m_edgeLength);
+	}
+	glBindVertexArray(0);	
 }
 
 ObjectBuffer::~ObjectBuffer()

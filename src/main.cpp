@@ -18,6 +18,7 @@
 #include "Resources/Resources.h"
 
 #include "ObjectBuffer.h"
+#include "Shapes.h"
 
 #if defined(POSIX)
 #include "unistd.h"
@@ -62,128 +63,6 @@ private:
 
 static bool g_bPrintf = true;
 
-static std::vector< Vector4 > HypercubeIndices() {
-	std::vector< Vector4 > vertices;
-
-	vertices.push_back(Vector4(1, 1, 1, 1));
-	vertices.push_back(Vector4(-1, 1, 1, 1));
-	vertices.push_back(Vector4(-1, -1, 1, 1));
-	vertices.push_back(Vector4(1, -1, 1, 1));
-
-	vertices.push_back(Vector4(1, -1, -1, 1));
-	vertices.push_back(Vector4(-1, -1, -1, 1));
-	vertices.push_back(Vector4(-1, 1, -1, 1));
-	vertices.push_back(Vector4(1, 1, -1, 1));
-
-	vertices.push_back(Vector4(1, 1, 1, -1));
-	vertices.push_back(Vector4(-1, 1, 1, -1));
-	vertices.push_back(Vector4(-1, -1, 1, -1));
-	vertices.push_back(Vector4(1, -1, 1, -1));
-
-	vertices.push_back(Vector4(1, -1, -1, -1));
-	vertices.push_back(Vector4(-1, -1, -1, -1));
-	vertices.push_back(Vector4(-1, 1, -1, -1));
-	vertices.push_back(Vector4(1, 1, -1, -1));
-
-	return vertices;
-}
-static std::vector< Surface > HypercubeSurfaces() {
-	std::vector< Surface > rtn;
-	std::vector<Vector4> vertices = HypercubeIndices();
-	std::set<std::set<size_t>> idxs;
-
-	for (size_t i = 0;i < vertices.size();i++) {
-		auto& vi = vertices[i];
-		for (size_t j = 0;j < vertices.size();j++) {
-			auto& vj = vertices[j];
-			if (i == j) continue;
-			if (cv::norm(vi - vj) > 2.01) continue;
-
-			for (size_t k = 0;k < vertices.size();k++) {
-				auto& vk = vertices[k];
-				if (cv::norm(vi - vk) > 2.01) continue;
-
-				for (size_t l = 0;l < vertices.size();l++) {
-					auto& vl = vertices[l];
-					if (cv::norm(vl - vk) > 2.01 || cv::norm(vl - vj) > 2.01) continue;
-
-					std::set<size_t> s{ i, j, k, l };
-					if (s.size() != 4) continue;
-					if (idxs.find(s) != idxs.end()) continue;
-					idxs.insert(s);
-
-					Surface surface;					
-					surface.emplace_back(vi);//(vi, vj, vl, vk, 1, 1);
-					surface.emplace_back(vj);
-					surface.emplace_back(vk);				
-					surface.emplace_back(vl);
-
-					rtn.push_back(surface);
-				}
-			}
-		}
-	}
-	return rtn;
-}
-
-static std::vector< Edge > HypercubeEdges() {
-	auto vertices = HypercubeIndices();
-	std::vector< Edge > rtn;
-
-	for (size_t i = 0;i < vertices.size();i++) {
-		auto& vi = vertices[i];
-		for (size_t j = 0;j < vertices.size();j++) {
-			auto& vj = vertices[j];
-			if (i == j) continue;
-			if (cv::norm(vi - vj) > 2.01) continue;
-
-			rtn.emplace_back(vi, vj);
-		}
-	}
-	return rtn;
-}
-static std::vector<Surface> CubeSurfaces() {
-	// Matrix4 mat( outermat.data() );
-
-	Vector4 A = Vector4(-1, -1, -1, 0);
-	Vector4 B = Vector4(1, -1, -1, 0);
-	Vector4 C = Vector4(1, 1, -1, 0);
-	Vector4 D = Vector4(-1, 1, -1, 0);
-
-	Vector4 E = Vector4(-1, -1, 1, 0);
-	Vector4 F = Vector4(1, -1, 1, 0);
-	Vector4 G = Vector4(1, 1, 1, 0);
-	Vector4 H = Vector4(-1, 1, 1, 0);
-
-	std::vector<Surface> rtn;
-
-	rtn.push_back(Surface({ F, E, G, H })); // Front
-	rtn.push_back(Surface({ A, B, D, C }));
-	rtn.push_back(Surface({ G, H, C, D }));
-	rtn.push_back(Surface({ B, A, F, E }));
-	rtn.push_back(Surface({ E, A, H, D }));
-	rtn.push_back(Surface({ B, F, C, G }));
-
-	return rtn;
-}
-
-static std::vector< Edge > GetEdges(const std::vector<Surface>& surfaces) {
-	std::vector< Edge > rtn;
-
-	for (auto& surface : surfaces) {
-		rtn.push_back(Edge(surface[0], surface[1]));
-		rtn.push_back(Edge(surface[0], surface[2]));
-		if (surface.size() == 3) {
-			rtn.push_back(Edge(surface[1], surface[2]));
-		}
-		else {
-			rtn.push_back(Edge(surface[3], surface[1]));
-			rtn.push_back(Edge(surface[3], surface[2]));
-		}
-	}
-	
-	return rtn; 
-}
 static std::vector< Surface > FiveCellSurfaces() {
 	std::vector< Surface > rtn;
 
@@ -796,9 +675,7 @@ bool CMainApplication::HandleInput()
 
 			if( sdlEvent.key.keysym.sym == SDLK_c )
 			{
-				for (auto& o : m_objects)
-					if (o.m_type != GL_LINES)
-						o.m_visible = !o.m_visible;
+				m_bShowCubes = !m_bShowCubes;
 			}
 		}
 	}
@@ -820,9 +697,6 @@ bool CMainApplication::HandleInput()
 
 			if (unDevice == firstC) {
 				m_bShowCubes = (state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Trigger));
-				for (auto& o : m_objects)
-					if (o.m_type != GL_LINES)
-						o.m_visible = m_bShowCubes;
 			}
 		}
 	}
@@ -1131,7 +1005,13 @@ void CMainApplication::SetupScene()
 		Vector3(1, 0, .5),
 	};
 	size_t idx = 0;
+	m_objects.push_back(ObjectBuffer(CubeSurfaces(1, 1, 1, 1)));
 
+	Matrix5 m = Matrix5::eye();
+	MatrixUtils::translate(m, 0, 0, 0, 3);
+	m_objects.back().SetTx(m);
+
+	/*
 	auto edges = HypercubeEdges(); 
 	auto csurfaces = CubeSurfaces(); 
 	for (auto& surface : csurfaces) {
@@ -1213,6 +1093,7 @@ void CMainApplication::SetupScene()
 	}
 	paintByPoseEdge(fourS);
 	m_objects.emplace_back(fourS);
+	*/
 }
 
 
@@ -1601,7 +1482,7 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	for (auto& buffer : m_objects) {
 		buffer.m_tx(4,4) = 4;
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
-		buffer.Draw(); 
+		buffer.Draw(m_bShowCubes); 
 	}
 	
 	bool bIsInputCapturedByAnotherProcess = m_pHMD->IsInputFocusCapturedByAnotherProcess();
@@ -1770,7 +1651,15 @@ void CMainApplication::UpdateHMDMatrixPose()
 
 	if (m_rTrackedDevicePose[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid )
 	{		
-		cv::invert(m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd], m_mat4HMDPose);		
+		if (m_strDriver == "null") {
+			m_mat4HMDPose = cv::Matx<float, 4, 4>::eye();
+			m_mat4HMDPose(2, 3) = -3;
+			//std::cerr << m_mat4HMDPose << std::endl;
+			//std::cerr << m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd] << std::endl;
+		}
+		else {
+			cv::invert(m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd], m_mat4HMDPose);
+		}		
 	}
 }
 
