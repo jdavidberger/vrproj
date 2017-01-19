@@ -16,7 +16,7 @@ void main()
     //outputColor = vec4(1.0, 0.0, 0.4, 1.0);
     }
     vec3 diffuse = intensity * lightColor;
-    vec3 ambient = vec3(.4, .4, .4);
+    vec3 ambient = vec3(.3, .2, .2);
    outputColor = vec4((ambient + diffuse) * v2UVcoords, .8);   
 //  outputColor = texture(mytexture, v2UVcoords);
 }

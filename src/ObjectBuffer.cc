@@ -31,7 +31,7 @@ void ObjectBuffer::SetupEdges(const std::vector< edge_t >& edges) {
 	}
 	SetBuffer(m_unEdgeVAO, this->m_glEdgeVertBuffer, this->m_edgeLength, data);
 }
-ObjectBuffer::ObjectBuffer(const Polytype_<4>::Polytope& shape) {
+ObjectBuffer::ObjectBuffer(GLuint programId, const Polytype_<4>::Polytope& shape) : m_programId(programId) {
 	SetupEdges(shape.edges);
 	SetupSurfaces(shape.surfaces);
 }
@@ -103,7 +103,7 @@ void ObjectBuffer::SetupSurfaces(const std::vector<Polytype_<4>::Surface>& surfa
 		for (auto tript : e.triangulation) {
 			VertexData v = tript;
 			v.normal = n;
-			v.rgb = edgeVertexColor(tript);
+			v.rgb = e.color;
 			AddVertex(data, v);
 		}
 	}
@@ -178,7 +178,7 @@ void ObjectBuffer::SetBuffer(GLuint& vao, GLuint& buffer, size_t& length,
 }
 
 void ObjectBuffer::Draw(bool drawSurfaces, bool drawEdges) const
-{
+{	
 	if (drawSurfaces) {
 		glBindVertexArray(m_unSceneVAO);
 		glDrawArrays(GL_TRIANGLES, 0, m_length);
@@ -187,6 +187,7 @@ void ObjectBuffer::Draw(bool drawSurfaces, bool drawEdges) const
 		glBindVertexArray(m_unEdgeVAO);
 		glDrawArrays(GL_LINES, 0, m_edgeLength);
 	}
+	glUseProgram(0);
 	glBindVertexArray(0);	
 }
 

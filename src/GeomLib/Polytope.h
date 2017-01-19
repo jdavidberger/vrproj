@@ -10,6 +10,7 @@ std::vector<cv::Vec2f> Triangulate2d(const std::vector<cv::Vec2f>& input);
 template <size_t N>
 struct Polytype_ {
 	struct Surface {
+		cv::Vec3f color;
 		Polygon_<N> boundary; 
 		std::vector< cv::Vec<float, N> > triangulation;		
 		void ComputeTriangulation() {
@@ -26,17 +27,12 @@ struct Polytype_ {
 			cv::Mat H(centeredBoundary.size(), N, CV_32F, &centeredBoundary[0]);
 			cv::Mat S, U, Vt;
 			cv::SVD::compute(H, S, U, Vt, cv::SVD::FULL_UV);
-
-			std::cerr << H << std::endl << S << std::endl << U << std::endl << Vt << std::endl;
-
-			std::cerr << Vt.t() << std::endl;
 			
 			std::vector<cv::Vec2f> planePts;
 
 			for (auto&pt : centeredBoundary) {
 				cv::Mat npt = Vt * cv::Mat(pt);
 				planePts.push_back(cv::Vec2f(npt.at<float>(0, 0), npt.at<float>(1, 0)));
-				std::cerr << Vt * cv::Mat(pt) << std::endl;
 			}
 			
 			auto tris = Triangulate2d(planePts);
@@ -47,7 +43,6 @@ struct Polytype_ {
 				in[1] = tri[1];
 				cv::Mat_<float> newmat = Vt.t() * cv::Mat(in);
 				cv::Vec<float, N> newpt = cv::Vec<float, N>((float*)newmat.data);
-				std::cerr << newmat << std::endl << newpt << std::endl;
 				triangulation.push_back(newpt + mean);
 			}
 		}

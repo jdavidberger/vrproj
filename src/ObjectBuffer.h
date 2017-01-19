@@ -20,6 +20,7 @@ struct ObjectBuffer {
 	typedef cv::Matx<float, 5, 5> matrix_t;
 	GLuint m_glSceneVertBuffer = 0;
 	GLuint m_unSceneVAO = 0;
+	GLuint m_programId = 0;
 	size_t m_length = 0;
 
 	GLuint m_glEdgeVertBuffer = 0;
@@ -30,7 +31,7 @@ struct ObjectBuffer {
 	matrix_t m_tx = matrix_t::eye();
 
 	void SetTx(const matrix_t& tx);
-	ObjectBuffer(const Polytype_<4>::Polytope& shape);
+	ObjectBuffer(GLuint programId, const Polytype_<4>::Polytope& shape);
 	void SetBuffer(GLuint& vao, GLuint& buffer, size_t& length, const std::vector<float>& vertices);
 	void Draw(bool drawSurfaces = true, bool drawEdges = true) const;
 	~ObjectBuffer();

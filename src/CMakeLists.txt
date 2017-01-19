@@ -1,24 +1,29 @@
 set(RESOURCES)
+
+set_property( GLOBAL PROPERTY USE_FOLDERS ON)
+add_custom_target(SHADERS )
+
 file (WRITE ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h "")
-macro(generate_resource filename)
-	set(name ${ARGN}) 
-	if(name MATCHES "") 
-		get_filename_component(name ${filename} NAME)		 
-		string(REPLACE "." "_" name ${name} )     
-	endif()  
-	    
-	file(READ ${filename} contents)
-	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/Resources/${name}.h "namespace Resources { extern const char* ${name}; }")
-	file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${name}.cpp "namespace Resources { const char* ${name} = R\"-_+*delimiter(${contents})-_+*delimiter\"; }")
-	list(APPEND RESOURCES "${filename}" "${CMAKE_CURRENT_BINARY_DIR}/${name}.cpp" "${CMAKE_CURRENT_BINARY_DIR}/Resources/${name}.h")
-	file (APPEND ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h "#include \"${CMAKE_CURRENT_BINARY_DIR}/Resources/${name}.h\"\n")
+macro(generate_resource filename) 
+    get_filename_component(name ${filename} NAME)		 
+    string(REPLACE "." "_" name ${name} )     
+ 
+    add_custom_target(${name}_shader	
+        COMMAND ${CMAKE_COMMAND} -DDESTINATION=${CMAKE_CURRENT_BINARY_DIR} -Dfilename=${filename} -P ${CMAKE_CURRENT_SOURCE_DIR}/CreateShaderFiles.cmake 
+        DEPENDS ${filename} ${CMAKE_CURRENT_SOURCE_DIR}/CreateShaderFiles.cmake 
+        COMMENT "Generating shader ${filename}..."
+    )
+    add_dependencies(SHADERS ${name}_shader)
+    list(APPEND RESOURCES "${filename}")
+	set_property(TARGET ${name}_shader PROPERTY FOLDER "Shader Projects")
+    file (APPEND ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h "#include \"${CMAKE_CURRENT_BINARY_DIR}/Resources/${name}.h\"\n")
 endmacro()
 
 add_definitions(-DGLEW_STATIC)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/resources )
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/Resources )
 
-FILE(GLOB resources_src RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/Resources/*")
+FILE(GLOB resources_src "${CMAKE_CURRENT_SOURCE_DIR}/Resources/*")
 
 FOREACH(rsrc ${resources_src})
 	generate_resource(${rsrc})	
@@ -32,6 +37,7 @@ add_library(vrprojLib
   ${RESOURCES} 
   ObjectBuffer.cc ObjectBuffer.h      
   )    
+add_dependencies(vrprojLib SHADERS)
 
 target_link_libraries( vrprojLib
 	  ${OPENGL_LIBRARIES}   

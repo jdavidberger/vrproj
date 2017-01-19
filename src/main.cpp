@@ -218,6 +218,7 @@ private: // OpenGL bookkeeping
 		VertexDataWindow( const Vector2 & pos, const Vector2 tex ) :  position(pos), texCoord(tex) {	}
 	};
 
+	GLuint m_unFloorProgramID;
 	GLuint m_unScene4dProgramID;
 	GLuint m_unSceneProgramID;
 	GLuint m_unCompanionWindowProgramID;
@@ -885,6 +886,11 @@ GLuint CMainApplication::CompileGLShader( const char *pchShaderName, const char 
 //-----------------------------------------------------------------------------
 bool CMainApplication::CreateAllShaders()
 {
+	m_unFloorProgramID = CompileGLShader(
+		"Floor",
+		Resources::scene_4d_vs,
+		Resources::floor_fs	
+	);
 	m_unScene4dProgramID = CompileGLShader(
 		"Scene.4d",
 		Resources::scene_4d_vs,
@@ -1005,14 +1011,32 @@ void CMainApplication::SetupScene()
 	};
 	size_t idx = 0;
 	
-	m_objects.push_back(ObjectBuffer(CubeSurfaces(1, 1, 1, 1)));
+	auto colorize = [&](Polytype_<4>::Polytope shape) {
+		for(size_t i = 0;i < shape.surfaces.size();i++) {
+			shape.surfaces[i].color = colors[idx++ % colors.size()];
+		}
+		return shape;
+	};
+
+	m_objects.push_back(ObjectBuffer(m_unScene4dProgramID, colorize ( CubeSurfaces(1, 1, 1, 1))));
 	Matrix5 m = Matrix5::eye();
-	MatrixUtils::translate(m, 0, 0, 0, 3);
+	MatrixUtils::translate(m, 0, 2, 0, 3);
 	m_objects.back().SetTx(m);
 
-	m_objects.push_back(ObjectBuffer( CubeSurfaces(1, 1, 1)));	
+	m_objects.push_back(ObjectBuffer(m_unScene4dProgramID, colorize(CubeSurfaces(1, 1, 1))));
 	MatrixUtils::translate(m, 3, 0, 0, 0);
 	m_objects.back().SetTx(m);
+
+	m_objects.push_back(ObjectBuffer(m_unScene4dProgramID, colorize(CubeSurfaces(1, 1))));
+	MatrixUtils::translate(m, -6, 0, 0, 0);
+	m_objects.back().SetTx(m);
+
+	Matrix5 m2 = Matrix5::eye();
+	m_objects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(100, 100)));
+	MatrixUtils::translate(m2, 0, 0, 0, 3);
+	MatrixUtils::setRotate(m2, 1, 2, M_PI / 2);	
+	m_objects.back().SetTx(m2);
+	
 	/*
 	auto edges = HypercubeEdges(); 
 	auto csurfaces = CubeSurfaces(); 
@@ -1426,7 +1450,7 @@ void CMainApplication::RenderStereoTargets()
 {
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
 	glEnable( GL_MULTISAMPLE );
-
+	glEnable(GL_BLEND);
 	// Left Eye
 	glBindFramebuffer( GL_FRAMEBUFFER, leftEyeDesc.m_nRenderFramebufferId );
  	glViewport(0, 0, m_nRenderWidth, m_nRenderHeight );
@@ -1478,11 +1502,12 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	//glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glUseProgram( m_unScene4dProgramID );
-	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);
-	glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
+	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);	
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
 	for (auto& buffer : m_objects) {
 		buffer.m_tx(4,4) = 4;
+		glUseProgram(buffer.m_programId);
+		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw(m_bShowCubes); 
 	}
@@ -1656,6 +1681,7 @@ void CMainApplication::UpdateHMDMatrixPose()
 		if (m_strDriver == "null") {
 			m_mat4HMDPose = cv::Matx<float, 4, 4>::eye();
 			m_mat4HMDPose(2, 3) = -3;
+			m_mat4HMDPose(1, 3) = -1;
 			//std::cerr << m_mat4HMDPose << std::endl;
 			//std::cerr << m_rmat4DevicePose[vr::k_unTrackedDeviceIndex_Hmd] << std::endl;
 		}

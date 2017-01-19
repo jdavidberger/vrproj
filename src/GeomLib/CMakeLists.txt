@@ -5,7 +5,8 @@ include_directories( ./ThirdParty/triangle . )
 
 add_library(GeomLib
     Polygon.h Polygon.cpp 
-	Polytope.h Polytope.cpp ./ThirdParty/triangle/triangle.c ./ThirdParty/triangle/triangle.h
+	Polytope.h Polytope.cpp 
+	./ThirdParty/triangle/triangle.c ./ThirdParty/triangle/triangle.h
   )    
 
 target_link_libraries( GeomLib
