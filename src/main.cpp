@@ -1005,12 +1005,15 @@ void CMainApplication::SetupScene()
 		Vector3(1, 0, .5),
 	};
 	size_t idx = 0;
+	
 	m_objects.push_back(ObjectBuffer(CubeSurfaces(1, 1, 1, 1)));
-
 	Matrix5 m = Matrix5::eye();
 	MatrixUtils::translate(m, 0, 0, 0, 3);
 	m_objects.back().SetTx(m);
 
+	m_objects.push_back(ObjectBuffer( CubeSurfaces(1, 1, 1)));	
+	MatrixUtils::translate(m, 3, 0, 0, 0);
+	m_objects.back().SetTx(m);
 	/*
 	auto edges = HypercubeEdges(); 
 	auto csurfaces = CubeSurfaces(); 

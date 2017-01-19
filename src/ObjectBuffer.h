@@ -43,5 +43,6 @@ struct ObjectBuffer {
 private:
 	typedef Polytype_<4>::edge_t edge_t; 
 	void SetupEdges(const std::vector< edge_t >& edges);
+	void SetupSurfaces(const std::vector< Polytype_<4>::Surface >& surfaces);
 };
 

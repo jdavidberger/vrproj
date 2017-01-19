@@ -69,7 +69,7 @@ static std::vector< Polygon_<4> > CubeSurfaces(float width, float height, float 
 	std::set<std::set<size_t>> idxs;
 
 	cv::Matx<float, 4, 4> scale = cv::Matx<float, 4, 4>::zeros();
-	cv::Vec<float, 4> diag(width, height, depth, wepth); 
+	cv::Vec<float, 4> diag(width/2., height / 2., depth / 2., wepth / 2.);
 	for (int i = 0;i < 4;i++)
 		scale(i, i) = diag(i);
 
@@ -96,8 +96,8 @@ static std::vector< Polygon_<4> > CubeSurfaces(float width, float height, float 
 					Polygon_<4> surface;
 					surface.emplace_back(scale * vi);//(vi, vj, vl, vk, 1, 1);
 					surface.emplace_back(scale * vj);
-					surface.emplace_back(scale * vk);
 					surface.emplace_back(scale * vl);
+					surface.emplace_back(scale * vk);
 
 					rtn.push_back(surface);
 				}

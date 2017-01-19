@@ -52,11 +52,29 @@ struct Polytype_ {
 			}
 		}
 
+		template <size_t M>
+		static Polygon_<N> Project(const Polygon_<M>& boundary) {
+			Polygon_<N> rtn;
+			for (auto& pt : boundary) {
+				cv::Vec<float, N> newpt = {};
+				for (size_t i = 0; i < std::min(N, M); i++)
+					newpt(i) = pt(i);
+				rtn.emplace_back(newpt);
+			}
+			return rtn;
+		}
+		
+		template <size_t M>
+		Surface(const Polygon_<M>& boundary) : boundary(Project(boundary)) {
+			ComputeTriangulation();
+		}
 		Surface(const Polygon_<N>& boundary) : boundary(boundary) {
 			ComputeTriangulation();
 		}
 	};
-	static std::vector< Surface > MakeSurfaces(const std::vector< Polygon_<N> >& polygons) {
+
+	template <size_t M>
+	static std::vector< Surface > MakeSurfaces(const std::vector< Polygon_<M> >& polygons) {
 		std::vector< Surface > rtn;
 		rtn.reserve(polygons.size());
 		for (auto& it : polygons)
@@ -95,9 +113,10 @@ struct Polytype_ {
 			}
 			this->edges.insert(this->edges.end(), edges.begin(), edges.end());
 		}
-		Polytope(const std::vector< Polygon_<N> >& polygons) : Polytope(MakeSurfaces(polygons)) {}
+		template <size_t M>
+		Polytope(const std::vector< Polygon_<M> >& polygons) : Polytope(MakeSurfaces(polygons)) {}
 		Polytope(const std::vector< Surface >& surfaces) : surfaces(surfaces) {
-			ComputeEdges();
+			ComputeEdges();	
 		}
 	};
 };

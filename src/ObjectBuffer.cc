@@ -25,6 +25,7 @@ void ObjectBuffer::SetupEdges(const std::vector< edge_t >& edges) {
 		VertexData d = e.first; 
 		d.rgb = edgeVertexColor(e.first); 
 		AddVertex(data, d);
+		d = e.second;
 		d.rgb = edgeVertexColor(e.second);
 		AddVertex(data, d);
 	}
@@ -32,6 +33,7 @@ void ObjectBuffer::SetupEdges(const std::vector< edge_t >& edges) {
 }
 ObjectBuffer::ObjectBuffer(const Polytype_<4>::Polytope& shape) {
 	SetupEdges(shape.edges);
+	SetupSurfaces(shape.surfaces);
 }
 
 static Vector4 CalculateNormalFromBasis(const Vector4& U, const Vector4& V, const Vector4& W) {
@@ -84,6 +86,32 @@ static Vector4 CalculateNormal(const Vector4& p1, const Vector4& p2, const Vecto
 	return e;
 }
 
+void ObjectBuffer::SetupSurfaces(const std::vector<Polytype_<4>::Surface>& surfaces)
+{
+	std::vector<float> data;
+
+	std::vector<Edge> edges;
+
+	for (auto& e : surfaces) {
+		auto n = CalculateNormal(e.triangulation[0], e.triangulation[1], e.triangulation[2]);
+
+		//if (cv::norm(n) < 0.99)
+			//assert(cv::norm(n) > 0.99);
+		if (cv::norm(e.triangulation[0] + n) < cv::norm(e.triangulation[0] - n))
+			n = -n;
+
+		for (auto tript : e.triangulation) {
+			VertexData v = tript;
+			v.normal = n;
+			v.rgb = edgeVertexColor(tript);
+			AddVertex(data, v);
+		}
+	}
+	SetBuffer(m_unSceneVAO, m_glSceneVertBuffer, m_length, data);
+	//children.emplace_back(edges);
+
+	//	SetBuffer(data, GL_LINE_STRIP);
+}
 /*
 ObjectBuffer::ObjectBuffer(const std::vector<Surface>& surfaces)
 {
@@ -157,7 +185,7 @@ void ObjectBuffer::Draw(bool drawSurfaces, bool drawEdges) const
 	}
 	if (drawEdges) {
 		glBindVertexArray(m_unEdgeVAO);
-		glDrawArrays(GL_LINE, 0, m_edgeLength);
+		glDrawArrays(GL_LINES, 0, m_edgeLength);
 	}
 	glBindVertexArray(0);	
 }
