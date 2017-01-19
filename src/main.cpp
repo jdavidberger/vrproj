@@ -185,6 +185,7 @@ private: // OpenGL bookkeeping
 	GLuint m_iTexture;
 
 	std::vector< ObjectBuffer > m_objects; 
+	std::vector< ObjectBuffer > m_staticObjects;
 	
 	GLuint m_unCompanionWindowVAO;
 	GLuint m_glCompanionWindowIDVertBuffer;
@@ -225,6 +226,7 @@ private: // OpenGL bookkeeping
 	GLuint m_unControllerTransformProgramID;
 	GLuint m_unRenderModelProgramID;
 
+	GLint m_nEye4MatrixLocation;
 	GLint m_nScene4MatrixLocation; 
 	GLint m_nScenetx4to3Location;
 	GLint m_nSceneMatrixLocation;
@@ -241,6 +243,7 @@ private: // OpenGL bookkeeping
 	};
 	FramebufferDesc leftEyeDesc;
 	FramebufferDesc rightEyeDesc;
+	Matrix5 viewPointTx = Matrix5::eye(); 
 
 	bool CreateFrameBuffer( int nWidth, int nHeight, FramebufferDesc &framebufferDesc );
 	
@@ -898,6 +901,7 @@ bool CMainApplication::CreateAllShaders()
 	);
 	m_nScenetx4to3Location = glGetUniformLocation(m_unScene4dProgramID, "tx4to3");
 	
+	m_nEye4MatrixLocation = glGetUniformLocation(m_unScene4dProgramID, "eyeMatrix");
 	m_nScene4MatrixLocation = glGetUniformLocation(m_unScene4dProgramID, "matrix");
 
 	m_unSceneProgramID = CompileGLShader(
@@ -1032,11 +1036,10 @@ void CMainApplication::SetupScene()
 	m_objects.back().SetTx(m);
 
 	Matrix5 m2 = Matrix5::eye();
-	m_objects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(100, 100)));
-	MatrixUtils::translate(m2, 0, 0, 0, 3);
-	MatrixUtils::setRotate(m2, 1, 2, M_PI / 2);	
-	m_objects.back().SetTx(m2);
-	
+	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(100, 20, 100, 10)));
+	MatrixUtils::translate(m2, 0, 10, 0, 0);	
+	m_staticObjects.back().SetTx(m2);
+
 	/*
 	auto edges = HypercubeEdges(); 
 	auto csurfaces = CubeSurfaces(); 
@@ -1221,8 +1224,10 @@ void CMainApplication::RenderControllerAxes()
 
 		const Matrix4 & mat = m_rmat4DevicePose[unTrackedDevice];
 
-		static Vector3 eulerA, eulerB; 
-		if (unTrackedDevice == firstC) {
+		static Vector3 eulerA(0, 0, 0);
+		static Vector3 eulerB(0, 0, 0);
+
+		if (unTrackedDevice == firstC) {	
 			controllerAPos = mat;
 			eulerA = MatrixUtils::getRotation(mat);
 		} else if (unTrackedDevice == secondC) {
@@ -1450,7 +1455,8 @@ void CMainApplication::RenderStereoTargets()
 {
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
 	glEnable( GL_MULTISAMPLE );
-	glEnable(GL_BLEND);
+	glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 	// Left Eye
 	glBindFramebuffer( GL_FRAMEBUFFER, leftEyeDesc.m_nRenderFramebufferId );
  	glViewport(0, 0, m_nRenderWidth, m_nRenderHeight );
@@ -1503,15 +1509,26 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 
 	glUseProgram( m_unScene4dProgramID );
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);	
+	
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
+
 	for (auto& buffer : m_objects) {
 		buffer.m_tx(4,4) = 4;
 		glUseProgram(buffer.m_programId);
 		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
+		//glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw(m_bShowCubes); 
 	}
-	
+	for (auto& buffer : m_staticObjects) {
+		buffer.m_tx(4, 4) = 4;
+		glUseProgram(buffer.m_programId);
+		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
+		//glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
+		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
+		buffer.Draw();
+	}
+
 	bool bIsInputCapturedByAnotherProcess = m_pHMD->IsInputFocusCapturedByAnotherProcess();
 
 	if( !bIsInputCapturedByAnotherProcess )

@@ -16,16 +16,16 @@ static std::vector< Polygon_<2> > CubeSurfaces(float width, float height) {
 
 static std::vector< Polygon_<3> > CubeSurfaces(float width, float height, float depth) {
 	static std::vector< Polygon_<3> > rtn;
-	
-	cv::Vec3f A = cv::Vec3f(-1, -1, -1);
-	cv::Vec3f B = cv::Vec3f(1, -1, -1);
-	cv::Vec3f C = cv::Vec3f(1, 1, -1);
-	cv::Vec3f D = cv::Vec3f(-1, 1, -1);
+	float w2 = width / 2., h2 = height / 2., d2 = depth / 2.0; 
+	cv::Vec3f A = cv::Vec3f(-w2, -h2, -d2);
+	cv::Vec3f B = cv::Vec3f(w2, -h2, -d2);
+	cv::Vec3f C = cv::Vec3f(w2, h2, -d2);
+	cv::Vec3f D = cv::Vec3f(-w2, h2, -d2);
 
-	cv::Vec3f E = cv::Vec3f(-1, -1, 1);
-	cv::Vec3f F = cv::Vec3f(1, -1, 1);
-	cv::Vec3f G = cv::Vec3f(1, 1, 1);
-	cv::Vec3f H = cv::Vec3f(-1, 1, 1);
+	cv::Vec3f E = cv::Vec3f(-w2, -h2, d2);
+	cv::Vec3f F = cv::Vec3f(w2, -h2, d2);
+	cv::Vec3f G = cv::Vec3f(w2, h2, d2);
+	cv::Vec3f H = cv::Vec3f(-w2, h2, d2);
 
 	rtn.push_back(Polygon_<3>({ F, E, H, G })); // Front
 	rtn.push_back(Polygon_<3>({ A, B, C, D }));

@@ -3,7 +3,7 @@ add_subdirectory(ThirdParty)
 add_definitions(-DNO_TIMER -DSINGLE -DANSI_DECLARATORS -DTRILIBRARY)
 include_directories( ./ThirdParty/triangle . ) 
 
-add_library(GeomLib
+add_library(GeomLib 
     Polygon.h Polygon.cpp 
 	Polytope.h Polytope.cpp 
 	./ThirdParty/triangle/triangle.c ./ThirdParty/triangle/triangle.h
