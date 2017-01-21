@@ -659,21 +659,17 @@ bool CMainApplication::HandleInput()
 					MatrixUtils::rotate(o.m_tx, 1, 2, .01);
 			}
 
-			if (sdlEvent.key.keysym.sym == SDLK_d) {
-				for (auto& o : m_objects)
-					MatrixUtils::rotate(o.m_tx, 0, 3, .01);
+			if (sdlEvent.key.keysym.sym == SDLK_d) {				
+					MatrixUtils::rotate(viewPointTx, 0, 3, .01);
 			}
-			if (sdlEvent.key.keysym.sym == SDLK_a) {
-				for (auto& o : m_objects)
-					MatrixUtils::rotate(o.m_tx, 0, 3, -.01);
+			if (sdlEvent.key.keysym.sym == SDLK_a) {				
+					MatrixUtils::rotate(viewPointTx, 0, 3, -.01);
 			}
 			if (sdlEvent.key.keysym.sym == SDLK_w) {
-				for (auto& o : m_objects)
-					MatrixUtils::rotate(o.m_tx, 1, 3, -.01);
+					MatrixUtils::rotate(viewPointTx, 1, 3, -.01);
 			}
-			if (sdlEvent.key.keysym.sym == SDLK_s) {
-				for (auto& o : m_objects)
-					MatrixUtils::rotate(o.m_tx, 1, 3, .01);
+			if (sdlEvent.key.keysym.sym == SDLK_s) {				
+					MatrixUtils::rotate(viewPointTx, 1, 3, .01);
 			}
 
 			if( sdlEvent.key.keysym.sym == SDLK_c )
@@ -1511,20 +1507,20 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);	
 	
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
-
-	for (auto& buffer : m_objects) {
-		buffer.m_tx(4,4) = 4;
+	viewPointTx(4, 4) = 4;
+	for (auto& buffer : m_objects) {		
+		//buffer.m_tx(4, 4) = 4;
 		glUseProgram(buffer.m_programId);
 		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
-		//glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
+		glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw(m_bShowCubes); 
 	}
-	for (auto& buffer : m_staticObjects) {
-		buffer.m_tx(4, 4) = 4;
+	for (auto& buffer : m_staticObjects) {		
+		//buffer.m_tx(4, 4) = 4;
 		glUseProgram(buffer.m_programId);
 		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
-		//glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
+		glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw();
 	}

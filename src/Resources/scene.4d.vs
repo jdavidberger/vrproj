@@ -40,8 +40,8 @@ void main()
 	float scratch[5];
 	//transform(pose5, tx4to3, pose5);
 	transform(scratch, tx4to3, pose5);
-	//transform(pos, eyeMatrix, pose5);
-	pos = down(scratch);
+	transform(pose5, eyeMatrix, scratch);
+	pos = down(pose5);
 	gl_Position = matrix * pos;
 	
     float normPose[5];

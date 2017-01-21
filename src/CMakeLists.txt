@@ -12,6 +12,7 @@ macro(generate_resource filename)
         COMMAND ${CMAKE_COMMAND} -DDESTINATION=${CMAKE_CURRENT_BINARY_DIR} -Dfilename=${filename} -P ${CMAKE_CURRENT_SOURCE_DIR}/CreateShaderFiles.cmake 
         DEPENDS ${filename} ${CMAKE_CURRENT_SOURCE_DIR}/CreateShaderFiles.cmake 
         COMMENT "Generating shader ${filename}..."
+		SOURCES ${filename} ${CMAKE_CURRENT_SOURCE_DIR}/CreateShaderFiles.cmake 
     )
     add_dependencies(SHADERS ${name}_shader)
     list(APPEND RESOURCES "${filename}")
