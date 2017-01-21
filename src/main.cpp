@@ -1234,10 +1234,17 @@ void CMainApplication::RenderControllerAxes()
 		auto newRotation =
 			MatrixUtils::getRotationMatrix(0, 1, eulerA[2]) *
 			MatrixUtils::getRotationMatrix(1, 2, eulerA[0]) *
-			MatrixUtils::getRotationMatrix(0, 2, eulerA[1]) *
+			MatrixUtils::getRotationMatrix(0, 2, eulerA[1]);
+
+		auto newViewRotation = 
 			MatrixUtils::getRotationMatrix(0, 3, eulerB[1]) *
 			MatrixUtils::getRotationMatrix(1, 3, eulerB[0]) *
 			MatrixUtils::getRotationMatrix(2, 3, eulerB[2]);
+
+		for (unsigned i = 0;i < 4;i++)
+			for (unsigned j = 0; j < 4; j++) {
+				viewPointTx(i, j) = newViewRotation(i, j);
+			}
 
 		for (auto& o : m_objects) {			
 			if (unTrackedDevice == firstC) {
