@@ -697,6 +697,12 @@ bool CMainApplication::HandleInput()
 			if (unDevice == firstC) {
 				m_bShowCubes = (state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Trigger));
 			}
+			else if (unDevice == secondC && (state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Touchpad))) {
+				auto moveZ = state.rAxis[0].y > 0 ? .25 : -.25;
+				Matrix5 txMat = Matrix5::eye();
+				txMat(3, 4) = moveZ;
+				viewPointTx = viewPointTx * txMat;
+			}
 		}
 	}
 
@@ -1032,7 +1038,7 @@ void CMainApplication::SetupScene()
 	m_objects.back().SetTx(m);
 
 	Matrix5 m2 = Matrix5::eye();
-	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(100, 20, 100, 10)));
+	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(50, 20, 50, 50)));
 	MatrixUtils::translate(m2, 0, 10, 0, 0);	
 	m_staticObjects.back().SetTx(m2);
 
@@ -1236,10 +1242,10 @@ void CMainApplication::RenderControllerAxes()
 			MatrixUtils::getRotationMatrix(1, 2, eulerA[0]) *
 			MatrixUtils::getRotationMatrix(0, 2, eulerA[1]);
 
-		auto newViewRotation = 
-			MatrixUtils::getRotationMatrix(0, 3, eulerB[1]) *
-			MatrixUtils::getRotationMatrix(1, 3, eulerB[0]) *
-			MatrixUtils::getRotationMatrix(2, 3, eulerB[2]);
+		auto newViewRotation =
+			MatrixUtils::getRotationMatrix(0, 3, eulerB[1]);
+			//MatrixUtils::getRotationMatrix(1, 3, eulerB[0]) *
+			//MatrixUtils::getRotationMatrix(2, 3, eulerB[2]);
 
 		for (unsigned i = 0;i < 4;i++)
 			for (unsigned j = 0; j < 4; j++) {
@@ -1515,11 +1521,13 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
 	viewPointTx(4, 4) = 4;
+	auto eye4d = viewPointTx.inv();
+
 	for (auto& buffer : m_objects) {		
 		//buffer.m_tx(4, 4) = 4;
 		glUseProgram(buffer.m_programId);
 		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
-		glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
+		glUniform1fv(m_nEye4MatrixLocation, 25, eye4d.val);
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw(m_bShowCubes); 
 	}
@@ -1527,7 +1535,7 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 		//buffer.m_tx(4, 4) = 4;
 		glUseProgram(buffer.m_programId);
 		glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
-		glUniform1fv(m_nEye4MatrixLocation, 25, viewPointTx.val);
+		glUniform1fv(m_nEye4MatrixLocation, 25, eye4d.val);
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw();
 	}
