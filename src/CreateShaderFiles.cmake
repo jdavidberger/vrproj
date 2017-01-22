@@ -5,4 +5,4 @@ if(name MATCHES "")
 endif()      
         
 file(READ ${filename} contents)
-file(WRITE ${DESTINATION}/Resources/${name}.h "namespace Resources { const char* ${name} = R\"-_+*delimiter(${contents})-_+*delimiter\"; }")
+file(WRITE ${DESTINATION}/Resources/${name}.h "namespace Resources { static const char* ${name} = R\"-_+*delimiter(${contents})-_+*delimiter\"; }")

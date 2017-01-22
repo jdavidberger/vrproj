@@ -1,16 +1,10 @@
-IF(NOT EXISTS "${CMAKE_SOURCE_DIR}/.cget/core.cmake")
-        IF(NOT DEFINED CGET_REPO_LOCATION)
-            set(CGET_REPO_LOCATION https://github.com/cget/cget-core)
-        ENDIF()
-        find_package(Git)
-        EXECUTE_PROCESS(COMMAND ${GIT_EXECUTABLE} clone ${CGET_REPO_LOCATION} "${CMAKE_SOURCE_DIR}/.cget" -bmaster)
-else()
-
-ENDIF()
 include("${CMAKE_SOURCE_DIR}/.cget/core.cmake" REQUIRED)
 
+SET(FREETYPE_LIBRARY ${CGET_INSTALL_DIR}/lib/freetype271.lib)
+CGET_HAS_DEPENDENCY(FreeType NUGET_PACKAGE FreeType GIT git://git.sv.nongnu.org/freetype/freetype2.git CMAKE_VERSION "2.7.1")
 CGET_HAS_DEPENDENCY(glew NUGET_PACKAGE glew.${CGET_MSVC_RUNTIME} GITHUB nigels-com/glew VERSION glew-1.11.0)
 CGET_HAS_DEPENDENCY(SDL2 REGISTRY VERSION master)
+CGET_HAS_DEPENDENCY(GLUT NUGET_PACKAGE nupengl.core GITHUB dcnieho/FreeGLUT VERSION FG_3_0_0)
 CGET_HAS_DEPENDENCY(openvr REGISTRY VERSION master)
 CGET_HAS_DEPENDENCY(OpenCV GITHUB opencv/opencv VERSION 3.1.0
   OPTIONS

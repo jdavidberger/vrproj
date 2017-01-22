@@ -15,9 +15,11 @@
 #include "shared/pathtools.h"
 
 #include "Resources/Resources.h"
-
 #include "ObjectBuffer.h"
 #include "Shapes.h"
+#include "GlUtils.h"
+
+#include "DrawText.h"
 
 #if defined(POSIX)
 #include "unistd.h"
@@ -30,6 +32,8 @@ static int secondC = -1;
 #else
 #include "windows.h"
 #endif
+
+#include "GL/freeglut.h"
 
 void ThreadSleep( unsigned long nMilliseconds )
 {
@@ -219,6 +223,7 @@ private: // OpenGL bookkeeping
 		VertexDataWindow( const Vector2 & pos, const Vector2 tex ) :  position(pos), texCoord(tex) {	}
 	};
 
+	::GlDrawText drawText;
 	GLuint m_unFloorProgramID;
 	GLuint m_unScene4dProgramID;
 	GLuint m_unSceneProgramID;
@@ -369,12 +374,12 @@ std::string GetTrackedDeviceString( vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_
 	return sResult;
 }
 
-
 //-----------------------------------------------------------------------------
 // Purpose:
 //-----------------------------------------------------------------------------
 bool CMainApplication::BInit()
 {
+
 	if ( SDL_Init( SDL_INIT_VIDEO | SDL_INIT_TIMER ) < 0 )
 	{
 		printf("%s - SDL could not initialize! SDL Error: %s\n", __FUNCTION__, SDL_GetError());
@@ -642,6 +647,19 @@ bool CMainApplication::HandleInput()
 				bRet = true;
 			}
 			
+			if (sdlEvent.key.keysym.sym == SDLK_PAGEUP) {
+				auto moveZ = .25;
+				Matrix5 txMat = Matrix5::eye();
+				txMat(3, 4) = moveZ;
+				viewPointTx = viewPointTx * txMat;
+			}
+			if (sdlEvent.key.keysym.sym == SDLK_PAGEDOWN) {
+				auto moveZ = -.25;
+				Matrix5 txMat = Matrix5::eye();
+				txMat(3, 4) = moveZ;
+				viewPointTx = viewPointTx * txMat;
+			}
+
 			if (sdlEvent.key.keysym.sym == SDLK_RIGHT) {
 				for (auto& o : m_objects)
 					MatrixUtils::rotate(o.m_tx, 0, 2, .01);
@@ -827,62 +845,7 @@ void CMainApplication::RenderFrame()
 //-----------------------------------------------------------------------------
 GLuint CMainApplication::CompileGLShader( const char *pchShaderName, const char *pchVertexShader, const char *pchFragmentShader )
 {
-	GLuint unProgramID = glCreateProgram();
-
-	GLuint nSceneVertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource( nSceneVertexShader, 1, &pchVertexShader, NULL);
-	glCompileShader( nSceneVertexShader );
-
-	GLint vShaderCompiled = GL_FALSE;
-	glGetShaderiv( nSceneVertexShader, GL_COMPILE_STATUS, &vShaderCompiled);
-	if ( vShaderCompiled != GL_TRUE)
-	{
-		char buffer[1024]; 
-		GLsizei  len = 0;
-		glGetShaderInfoLog(nSceneVertexShader, 1024, &len, buffer);
-		dprintf("%s - Unable to compile vertex shader %d!\n %s \n", pchShaderName, nSceneVertexShader, buffer);
-		glDeleteProgram( unProgramID );
-		glDeleteShader( nSceneVertexShader );
-		return 0;
-	}
-	glAttachShader( unProgramID, nSceneVertexShader);
-	glDeleteShader( nSceneVertexShader ); // the program hangs onto this once it's attached
-
-	GLuint  nSceneFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource( nSceneFragmentShader, 1, &pchFragmentShader, NULL);
-	glCompileShader( nSceneFragmentShader );
-
-	GLint fShaderCompiled = GL_FALSE;
-	glGetShaderiv( nSceneFragmentShader, GL_COMPILE_STATUS, &fShaderCompiled);
-	if (fShaderCompiled != GL_TRUE)
-	{
-		char buffer[1024];
-		GLsizei  len = 0;
-		glGetShaderInfoLog(nSceneFragmentShader, 1024, &len, buffer);
-		dprintf("%s - Unable to compile fragment shader %d!\n %s \n", pchShaderName, nSceneFragmentShader, buffer );
-		glDeleteProgram( unProgramID );
-		glDeleteShader( nSceneFragmentShader );
-		return 0;	
-	}
-
-	glAttachShader( unProgramID, nSceneFragmentShader );
-	glDeleteShader( nSceneFragmentShader ); // the program hangs onto this once it's attached
-
-	glLinkProgram( unProgramID );
-
-	GLint programSuccess = GL_TRUE;
-	glGetProgramiv( unProgramID, GL_LINK_STATUS, &programSuccess);
-	if ( programSuccess != GL_TRUE )
-	{
-		dprintf("%s - Error linking program %d!\n", pchShaderName, unProgramID);
-		glDeleteProgram( unProgramID );
-		return 0;
-	}
-
-	glUseProgram( unProgramID );
-	glUseProgram( 0 );
-
-	return unProgramID;
+	return ::CompileGLShader(pchShaderName, pchVertexShader, pchFragmentShader);
 }
 
 
@@ -1038,7 +1001,7 @@ void CMainApplication::SetupScene()
 	m_objects.back().SetTx(m);
 
 	Matrix5 m2 = Matrix5::eye();
-	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(50, 20, 50, 50)));
+	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(20, 20, 20, 20)));
 	MatrixUtils::translate(m2, 0, 10, 0, 0);	
 	m_staticObjects.back().SetTx(m2);
 
@@ -1514,11 +1477,16 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
-	//glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glUseProgram( m_unScene4dProgramID );
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);	
-	
+	Matrix4 textMatrix = viewMatrix * Matrix4(
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, -1,
+		0, 0, 0, 1);
+	drawText(textMatrix, 0, 0, 1., "Test");
+
+	glUseProgram(m_unScene4dProgramID);
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
 	viewPointTx(4, 4) = 4;
 	auto eye4d = viewPointTx.inv();
@@ -1539,7 +1507,7 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 		glUniform1fv(m_nScenetx4to3Location, 25, buffer.m_tx.val);
 		buffer.Draw();
 	}
-
+	
 	bool bIsInputCapturedByAnotherProcess = m_pHMD->IsInputFocusCapturedByAnotherProcess();
 
 	if( !bIsInputCapturedByAnotherProcess )
@@ -1964,7 +1932,7 @@ void CGLRenderModel::Draw()
 int main(int argc, char *argv[])
 {
 	CMainApplication *pMainApplication = new CMainApplication( argc, argv );
-
+	
 	if (!pMainApplication->BInit())
 	{
 		pMainApplication->Shutdown();

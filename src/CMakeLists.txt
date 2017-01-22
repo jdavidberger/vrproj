@@ -2,6 +2,7 @@ set(RESOURCES)
 
 set_property( GLOBAL PROPERTY USE_FOLDERS ON)
 add_custom_target(SHADERS )
+set_property(TARGET SHADERS PROPERTY FOLDER "Shader Projects")
 
 file (WRITE ${CMAKE_CURRENT_BINARY_DIR}/Resources/Resources.h "")
 macro(generate_resource filename) 
@@ -37,6 +38,8 @@ add_library(vrprojLib
   ${SHARED_SRC_FILES}
   ${RESOURCES} 
   ObjectBuffer.cc ObjectBuffer.h      
+  DrawText.h DrawText.cc
+  GlUtils.h GlUtils.cc
   )    
 add_dependencies(vrprojLib SHADERS)
 
@@ -47,7 +50,10 @@ target_link_libraries( vrprojLib
 	  SDL2::SDL2 
       GeomLib
 	  ${OPENVR_LIBRARY}    
-	  ${CMAKE_DL_LIBS} )
+	  ${CMAKE_DL_LIBS} 
+	  GLUT::GLUT
+	  ${FREETYPE_LIBRARY}
+	  )
 	   
 add_executable(vrproj
   main.cpp  
@@ -57,5 +63,3 @@ target_link_libraries(vrproj vrprojLib)
 
 add_executable(vrprojTest test.cc)
 target_link_libraries(vrprojTest vrprojLib GeomLib)
-
-
