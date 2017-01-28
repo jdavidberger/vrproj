@@ -115,7 +115,8 @@ struct DrawText_p {
 	DrawText_p() {
 		init();
 	}
-	void operator()(const Matrix4& tx, float x, float y, float scale, const std::string& text) {		
+	void operator()(const Matrix4& tx, float _x, float y, float scale, const std::string& text) {		
+		float x = _x;
 		// Iterate through all characters		
 		glUseProgram(fontShader);
 		glUniform3f(textColor, 1.0f, 1.0f, 1.0f);
@@ -124,6 +125,11 @@ struct DrawText_p {
 		glBindVertexArray(VAO);
 		
 		for (auto c = text.begin(); c != text.end(); c++) {
+			if (*c == '\n') {
+				y -= 64 * scale;
+				x = _x; 
+				continue; 
+			}
 			Character ch = Characters[*c];
 
 			GLfloat xpos = x + ch.Bearing[0] * scale;

@@ -47,6 +47,7 @@ target_link_libraries( vrprojLib
 	  ${OPENGL_LIBRARIES}   
 	  GLEW::GLEW
 	  opencv_core
+	  FastNoise
 	  SDL2::SDL2 
       GeomLib
 	  ${OPENVR_LIBRARY}    

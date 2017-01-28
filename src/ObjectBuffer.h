@@ -17,6 +17,7 @@ typedef std::vector<VertexData> Surface;
 typedef std::tuple<VertexData, VertexData> Edge;
 
 struct ObjectBuffer {
+	ObjectBuffer() {}
 	typedef cv::Matx<float, 5, 5> matrix_t;
 	GLuint m_glSceneVertBuffer = 0;
 	GLuint m_unSceneVAO = 0;
@@ -38,7 +39,8 @@ struct ObjectBuffer {
 
 	cv::Vec3f edgeVertexColor(const cv::Vec4f& vertex) {
 		cv::Vec3f color(.1, .1, .1);
-		color[0] = (vertex[3] + 1.) / 2.;
+		color[0] = (vertex[3] + 10.) / 20.;
+		color[1] = (vertex[2] + 10.) / 20.;
 		return color; 
 	}
 private:

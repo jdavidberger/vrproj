@@ -13,12 +13,12 @@
 #include "shared/lodepng.h"
 #include "shared/Matrices.h"
 #include "shared/pathtools.h"
-
+#include <iomanip>
 #include "Resources/Resources.h"
 #include "ObjectBuffer.h"
 #include "Shapes.h"
 #include "GlUtils.h"
-
+#include "FastNoise.h"
 #include "DrawText.h"
 
 #if defined(POSIX)
@@ -89,6 +89,7 @@ static std::vector< Surface > FiveCellSurfaces() {
 
 	return rtn;
 }
+
 //-----------------------------------------------------------------------------
 // Purpose:
 //------------------------------------------------------------------------------
@@ -132,8 +133,11 @@ public:
 
 	Matrix4 GetHMDMatrixProjectionEye( vr::Hmd_Eye nEye );
 	Matrix4 GetHMDMatrixPoseEye( vr::Hmd_Eye nEye );
+	Matrix4 GetCurrentEyeMatrix(vr::Hmd_Eye nEye);
 	Matrix4 GetCurrentViewProjectionMatrix( vr::Hmd_Eye nEye );
 	void UpdateHMDMatrixPose();
+	ObjectBuffer hyperCube; 
+	ObjectBuffer surface; 
 
 	Matrix4 ConvertSteamVRMatrixToMatrix4( const vr::HmdMatrix34_t &matPose );
 
@@ -157,6 +161,7 @@ private:
 	vr::TrackedDevicePose_t m_rTrackedDevicePose[ vr::k_unMaxTrackedDeviceCount ];
 	Matrix4 m_rmat4DevicePose[ vr::k_unMaxTrackedDeviceCount ];
 	bool m_rbShowTrackedDevice[ vr::k_unMaxTrackedDeviceCount ];
+	std::vector<Matrix5> voxTx;
 
 private: // SDL bookkeeping
 	SDL_Window *m_pCompanionWindow;
@@ -520,7 +525,7 @@ bool CMainApplication::BInitGL()
 		glDebugMessageControl( GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE );
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 	}
-	glLineWidth(10);
+	glLineWidth(5);
 	glDisable(GL_CULL_FACE);
 	
 	if( !CreateAllShaders() )
@@ -713,12 +718,16 @@ bool CMainApplication::HandleInput()
 			m_rbShowTrackedDevice[unDevice] = state.ulButtonPressed == 0;
 
 			if (unDevice == firstC) {
-				m_bShowCubes = (state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Trigger));
+				m_bShowCubes = !(state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Trigger));
 			}
 			else if (unDevice == secondC && (state.ulButtonPressed & vr::ButtonMaskFromId(vr::EVRButtonId::k_EButton_SteamVR_Touchpad))) {
-				auto moveZ = state.rAxis[0].y > 0 ? .25 : -.25;
+				auto moveW = state.rAxis[0].y > 0 ? .25 : -.25;
+				if (abs(state.rAxis[0].y) < .5) moveW = 0;
+				auto moveZ = state.rAxis[0].x > 0 ? .25 : -.25;
+				if (abs(state.rAxis[0].x) < .5) moveZ = 0;
 				Matrix5 txMat = Matrix5::eye();
-				txMat(3, 4) = moveZ;
+				txMat(3, 4) = moveW;
+				txMat(2, 4) = moveZ;
 				viewPointTx = viewPointTx * txMat;
 			}
 		}
@@ -999,12 +1008,36 @@ void CMainApplication::SetupScene()
 	m_objects.push_back(ObjectBuffer(m_unScene4dProgramID, colorize(CubeSurfaces(1, 1))));
 	MatrixUtils::translate(m, -6, 0, 0, 0);
 	m_objects.back().SetTx(m);
-
+	FastNoise fastNoise;
+	auto hyperCubeShape = colorize(CubeSurfaces(1, 1, 1, 1));
+	hyperCube = ObjectBuffer(m_unScene4dProgramID, hyperCubeShape);
+	Polytype_<4>::Polytope _surface; 
+	size_t in = 0, out = 0;
+	fastNoise.SetFrequency(0.1);
+	for(int x = -10;x <= 10;x++)
+		for (int y = -10; y <= 10; y++)
+			for (int z = -10; z <= 10; z++)
+				for (int w = -10; w <= 10; w++) {
+					auto weight = fastNoise.GetSimplex(x, y, z, w); 
+					if (weight > 0.5) {						
+						Matrix5 m = Matrix5::eye();
+						MatrixUtils::translate(m, x, y, z, w);						
+						_surface.Add(hyperCubeShape.Transform(m) );
+						in++;
+					}
+					else {
+						out++;
+					}
+				}
+	surface = ObjectBuffer(m_unScene4dProgramID, _surface);
+	std::cerr << in << ", " << out << std::endl;
+	/*
 	Matrix5 m2 = Matrix5::eye();
-	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(20, 20, 20, 20)));
-	MatrixUtils::translate(m2, 0, 10, 0, 0);	
+	m_staticObjects.push_back(ObjectBuffer(m_unFloorProgramID, CubeSurfaces(100, 100, 100)));
+	MatrixUtils::setRotate(m2, 1, 3, M_PI / 2.0);	
+	std::cerr << m2 << std::endl;
 	m_staticObjects.back().SetTx(m2);
-
+	*/
 	/*
 	auto edges = HypercubeEdges(); 
 	auto csurfaces = CubeSurfaces(); 
@@ -1479,18 +1512,25 @@ void CMainApplication::RenderScene( vr::Hmd_Eye nEye )
 	glDepthFunc(GL_LEQUAL);
 
 	auto viewMatrix = GetCurrentViewProjectionMatrix(nEye);	
-	Matrix4 textMatrix = viewMatrix * Matrix4(
+	Matrix4 textMatrix = GetCurrentEyeMatrix(nEye) * Matrix4(
 		1, 0, 0, 0,
 		0, 1, 0, 0,
-		0, 0, 1, -1,
+		0, 0, 1, -10,
 		0, 0, 0, 1);
-	drawText(textMatrix, 0, 0, 1., "Test");
+	std::stringstream ss;
+	ss << std::fixed << std::setprecision(3) << std::setw(3) << viewPointTx.t();
+	//drawText(textMatrix, -5, 5, 1./32., ss.str());
 
 	glUseProgram(m_unScene4dProgramID);
 	glBindTexture(GL_TEXTURE_2D, m_iTexture);
-	viewPointTx(4, 4) = 4;
+	viewPointTx(4, 4) = 1;
 	auto eye4d = viewPointTx.inv();
-
+	
+	glUniformMatrix4fv(m_nScene4MatrixLocation, 1, GL_TRUE, viewMatrix.val);
+	glUniform1fv(m_nEye4MatrixLocation, 25, eye4d.val);
+	glUniform1fv(m_nScenetx4to3Location, 25, surface.m_tx.val);	
+	surface.Draw(m_bShowCubes, !m_bShowCubes);
+	
 	for (auto& buffer : m_objects) {		
 		//buffer.m_tx(4, 4) = 4;
 		glUseProgram(buffer.m_programId);
@@ -1617,6 +1657,20 @@ Matrix4 CMainApplication::GetHMDMatrixPoseEye( vr::Hmd_Eye nEye )
 	return matrixObj;
 }
 
+
+
+Matrix4 CMainApplication::GetCurrentEyeMatrix(vr::Hmd_Eye nEye) {
+	Matrix4 matMVP = Matrix4::eye();
+	if (nEye == vr::Eye_Left)
+	{
+		matMVP = m_mat4ProjectionLeft * m_mat4eyePosLeft;
+	} else if (nEye == vr::Eye_Right)
+	{
+		matMVP = m_mat4ProjectionRight * m_mat4eyePosRight;
+	}
+
+	return matMVP;
+}
 
 //-----------------------------------------------------------------------------
 // Purpose: Gets a Current View Projection Matrix with respect to nEye,

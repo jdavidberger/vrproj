@@ -93,6 +93,8 @@ void ObjectBuffer::SetupSurfaces(const std::vector<Polytype_<4>::Surface>& surfa
 	std::vector<Edge> edges;
 
 	for (auto& e : surfaces) {
+		if (e.triangulation.empty())
+			continue;
 		auto n = CalculateNormal(e.triangulation[0], e.triangulation[1], e.triangulation[2]);
 
 		//if (cv::norm(n) < 0.99)

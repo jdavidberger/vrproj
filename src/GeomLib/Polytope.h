@@ -4,15 +4,39 @@
 #include <iostream>
 #include <utility>
 #include <unordered_set>
-
+#include "shared/Matrices.h"
 std::vector<cv::Vec2f> Triangulate2d(const std::vector<cv::Vec2f>& input);
 
 template <size_t N>
 struct Polytype_ {
+
+	static cv::Vec<float, N> TransformPt(const cv::Matx<float, N + 1, N + 1>& tx, const cv::Vec<float, N>& pt) {
+		cv::Vec<float, N + 1> in;
+		for (size_t i = 0; i < N; i++)
+			in[i] = pt[i];
+		in[N] = 1.0;
+		auto out = tx * in; 
+		cv::Vec<float, N> rtn;
+		for (size_t i = 0; i < N; i++)
+			rtn[i] = out[i] / out[N]; 
+		return rtn; 
+	}
+
 	struct Surface {
 		cv::Vec3f color;
 		Polygon_<N> boundary; 
-		std::vector< cv::Vec<float, N> > triangulation;		
+		std::vector< cv::Vec<float, N> > triangulation;	
+
+		Surface Transform(const cv::Matx<float, N+1, N + 1>& tx) const {
+			Surface rtn;
+			rtn.color = color; 
+			rtn.boundary.reserve(boundary.size()); 
+			rtn.triangulation.reserve(triangulation.size());
+			for (auto& b : boundary) rtn.boundary.push_back(TransformPt(tx, b));
+			for (auto& b : triangulation) rtn.triangulation.push_back(TransformPt(tx, b));
+			return rtn; 
+		}
+
 		void ComputeTriangulation() {
 			cv::Vec<float, N> mean; 
 			Polygon_<N> centeredBoundary;
@@ -36,7 +60,7 @@ struct Polytype_ {
 			}
 			
 			auto tris = Triangulate2d(planePts);
-			triangulation.resize(tris.size());
+			triangulation.reserve(tris.size());
 			for (auto& tri : tris) {
 				cv::Vec<float, N> in = cv::Vec<float, N>::all(0);
 				in[0] = tri[0];
@@ -63,6 +87,7 @@ struct Polytype_ {
 		Surface(const Polygon_<M>& boundary) : boundary(Project(boundary)) {
 			ComputeTriangulation();
 		}
+		Surface() {}
 		Surface(const Polygon_<N>& boundary) : boundary(boundary) {
 			ComputeTriangulation();
 		}
@@ -95,6 +120,10 @@ struct Polytype_ {
 		
 		std::vector< Surface > surfaces; 
 		std::vector< edge_t > edges; 
+		void Add(const Polytope& p) {
+			surfaces.insert(surfaces.end(), p.surfaces.begin(), p.surfaces.end());
+			edges.insert(edges.end(), p.edges.begin(), p.edges.end());
+		}
 		void ComputeEdges() {
 			std::set<edge_t, EdgeComparator> edges; 
 
@@ -113,6 +142,20 @@ struct Polytype_ {
 		Polytope(const std::vector< Surface >& surfaces) : surfaces(surfaces) {
 			ComputeEdges();	
 		}
+		Polytope Transform(const cv::Matx<float, N +1, N + 1>& tx) const {
+			Polytope rtn; 
+			rtn.surfaces.reserve(surfaces.size());
+			rtn.edges.reserve(edges.size());
+
+			for (auto& s : surfaces) rtn.surfaces.push_back(s.Transform(tx));
+			for (auto& s : edges) {
+				rtn.edges.push_back( std::make_pair(TransformPt(tx, s.first), 
+													TransformPt(tx, s.second)));
+			}
+
+			return rtn;
+		}
+		Polytope() {}
 	};
 };
 
